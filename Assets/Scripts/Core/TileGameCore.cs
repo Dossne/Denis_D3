@@ -13,6 +13,9 @@ namespace Tiles.Core
     public sealed class TileGameCore
     {
         private const int MatchSize = 3;
+        private const int BoardColumns = 6;
+        private const int BoardRows = 6;
+        private const int MaxStacksPerLayer = BoardColumns * BoardRows;
 
         private readonly List<TileModel> _tiles = new List<TileModel>();
         private readonly List<TileType> _tray = new List<TileType>();
@@ -342,13 +345,17 @@ namespace Tiles.Core
 
         private static List<BoardCoordinate> BuildCoordinates(int slotsCount)
         {
+            if (slotsCount > MaxStacksPerLayer)
+            {
+                throw new InvalidOperationException("Stacks per layer cannot exceed 36 for a 6x6 board.");
+            }
+
             var coordinates = new List<BoardCoordinate>(slotsCount);
-            var columns = (int)Math.Ceiling(Math.Sqrt(slotsCount));
 
             for (var i = 0; i < slotsCount; i++)
             {
-                var column = i % columns;
-                var row = i / columns;
+                var column = i % BoardColumns;
+                var row = i / BoardColumns;
                 coordinates.Add(new BoardCoordinate(column, row));
             }
 
@@ -386,6 +393,12 @@ namespace Tiles.Core
             if (definition.TileCount % definition.LayerCount != 0)
             {
                 throw new InvalidOperationException("TileCount must be divisible by LayerCount.");
+            }
+
+            var stacksPerLayer = definition.TileCount / definition.LayerCount;
+            if (stacksPerLayer > MaxStacksPerLayer)
+            {
+                throw new InvalidOperationException("TileCount / LayerCount cannot exceed 36 stacks for the 6x6 board.");
             }
 
             if (definition.SymbolCount <= 0)
