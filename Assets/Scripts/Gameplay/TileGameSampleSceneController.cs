@@ -242,8 +242,12 @@ namespace Tiles.Gameplay
 
             var gridWidth = columnsCount * tileSize + ((columnsCount - 1) * gap);
             var gridHeight = rowsCount * tileSize + ((rowsCount - 1) * gap);
+            var layerVisualStep = Mathf.Clamp(Scale(6f), Scale(3f), tileSize * 0.14f);
+            var stackOffsetTotal = maxLayer * layerVisualStep;
+            var stackHeight = gridHeight + stackOffsetTotal;
             var gridLeft = rect.x + ((rect.width - gridWidth) * 0.5f);
-            var gridTop = rect.y + ((rect.height - gridHeight) * 0.5f);
+            var stackTop = rect.y + ((rect.height - stackHeight) * 0.5f);
+            var baseGridTop = stackTop + stackOffsetTotal;
 
             for (var layer = 0; layer <= maxLayer; layer++)
             {
@@ -257,7 +261,7 @@ namespace Tiles.Gameplay
 
                     var tileRect = new Rect(
                         gridLeft + tile.Column * (tileSize + gap),
-                        gridTop + tile.Row * (tileSize + gap),
+                        baseGridTop + tile.Row * (tileSize + gap) - (layer * layerVisualStep),
                         tileSize,
                         tileSize);
 
