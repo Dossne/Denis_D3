@@ -16,6 +16,7 @@ namespace Tiles.Core
         private const int BoardColumns = 6;
         private const int BoardRows = 6;
         private const int MaxStacksPerLayer = BoardColumns * BoardRows;
+        private const int MaxSectorStackHeight = 9;
 
         private readonly List<TileModel> _tiles = new List<TileModel>();
         private readonly List<TileType> _tray = new List<TileType>();
@@ -47,25 +48,52 @@ namespace Tiles.Core
 
             var random = new Random(seed);
             var tileTypes = BuildTileTypeList(definition, random);
-            var slotsPerLayer = definition.TileCount / definition.LayerCount;
-            var coordinates = BuildCoordinates(slotsPerLayer);
 
             var tileId = 0;
             var typeIndex = 0;
-            for (var layer = 0; layer < definition.LayerCount; layer++)
+            if (definition.HasCustomSectorStacks)
             {
-                for (var i = 0; i < coordinates.Count; i++)
+                for (var layer = 0; layer < definition.LayerCount; layer++)
                 {
-                    var coordinate = coordinates[i];
-                    _tiles.Add(new TileModel(
-                        id: tileId,
-                        type: tileTypes[typeIndex],
-                        column: coordinate.Column,
-                        row: coordinate.Row,
-                        layer: layer));
+                    for (var sectorIndex = 0; sectorIndex < definition.SectorStacks.Length; sectorIndex++)
+                    {
+                        if (definition.SectorStacks[sectorIndex] <= layer)
+                        {
+                            continue;
+                        }
 
-                    tileId++;
-                    typeIndex++;
+                        _tiles.Add(new TileModel(
+                            id: tileId,
+                            type: tileTypes[typeIndex],
+                            column: sectorIndex % BoardColumns,
+                            row: sectorIndex / BoardColumns,
+                            layer: layer));
+
+                        tileId++;
+                        typeIndex++;
+                    }
+                }
+            }
+            else
+            {
+                var slotsPerLayer = definition.TileCount / definition.LayerCount;
+                var coordinates = BuildCoordinates(slotsPerLayer);
+
+                for (var layer = 0; layer < definition.LayerCount; layer++)
+                {
+                    for (var i = 0; i < coordinates.Count; i++)
+                    {
+                        var coordinate = coordinates[i];
+                        _tiles.Add(new TileModel(
+                            id: tileId,
+                            type: tileTypes[typeIndex],
+                            column: coordinate.Column,
+                            row: coordinate.Row,
+                            layer: layer));
+
+                        tileId++;
+                        typeIndex++;
+                    }
                 }
             }
 
@@ -390,15 +418,63 @@ namespace Tiles.Core
                 throw new InvalidOperationException("LayerCount must be greater than 0.");
             }
 
-            if (definition.TileCount % definition.LayerCount != 0)
+            if (definition.HasCustomSectorStacks)
             {
-                throw new InvalidOperationException("TileCount must be divisible by LayerCount.");
-            }
+                if (definition.SectorStacks.Length != MaxStacksPerLayer)
+                {
+                    throw new InvalidOperationException("SectorStacks length must be exactly 36.");
+                }
 
-            var stacksPerLayer = definition.TileCount / definition.LayerCount;
-            if (stacksPerLayer > MaxStacksPerLayer)
+                var tileCountByStacks = 0;
+                var maxStackHeight = 0;
+                var nonEmptySectors = 0;
+                for (var i = 0; i < definition.SectorStacks.Length; i++)
+                {
+                    var stackHeight = definition.SectorStacks[i];
+                    if (stackHeight < 0 || stackHeight > MaxSectorStackHeight)
+                    {
+                        throw new InvalidOperationException("Each sector stack height must be between 0 and 9.");
+                    }
+
+                    tileCountByStacks += stackHeight;
+                    if (stackHeight > maxStackHeight)
+                    {
+                        maxStackHeight = stackHeight;
+                    }
+
+                    if (stackHeight > 0)
+                    {
+                        nonEmptySectors++;
+                    }
+                }
+
+                if (tileCountByStacks != definition.TileCount)
+                {
+                    throw new InvalidOperationException("TileCount must match the sum of SectorStacks.");
+                }
+
+                if (maxStackHeight != definition.LayerCount)
+                {
+                    throw new InvalidOperationException("LayerCount must match the maximum value in SectorStacks.");
+                }
+
+                if (definition.StartingFreeTiles > 0 && definition.StartingFreeTiles != nonEmptySectors)
+                {
+                    throw new InvalidOperationException("StartingFreeTiles must match the number of non-empty sectors.");
+                }
+            }
+            else
             {
-                throw new InvalidOperationException("TileCount / LayerCount cannot exceed 36 stacks for the 6x6 board.");
+                if (definition.TileCount % definition.LayerCount != 0)
+                {
+                    throw new InvalidOperationException("TileCount must be divisible by LayerCount.");
+                }
+
+                var stacksPerLayer = definition.TileCount / definition.LayerCount;
+                if (stacksPerLayer > MaxStacksPerLayer)
+                {
+                    throw new InvalidOperationException("TileCount / LayerCount cannot exceed 36 stacks for the 6x6 board.");
+                }
             }
 
             if (definition.SymbolCount <= 0)
