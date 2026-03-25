@@ -67,18 +67,21 @@ namespace Tiles.Gameplay
             var topHeight = Scale(76f);
             var controlsHeight = Scale(72f);
             var trayHeight = Scale(142f);
+            var traySideMargin = Scale(8f);
+            var trayBottomMargin = Scale(8f);
+            var controlsToTrayGap = Scale(8f);
 
             var topRect = new Rect(padding, padding, Screen.width - (padding * 2f), topHeight);
+            var trayRect = new Rect(
+                traySideMargin,
+                Screen.height - trayHeight - trayBottomMargin,
+                Screen.width - (traySideMargin * 2f),
+                trayHeight);
             var controlsRect = new Rect(
                 padding,
-                Screen.height - trayHeight - controlsHeight - (padding * 2f),
+                trayRect.y - controlsHeight - controlsToTrayGap,
                 Screen.width - (padding * 2f),
                 controlsHeight);
-            var trayRect = new Rect(
-                padding,
-                Screen.height - trayHeight - padding,
-                Screen.width - (padding * 2f),
-                trayHeight);
             var boardHeight = controlsRect.yMin - topRect.yMax - (padding * 2f);
             var boardRect = new Rect(
                 padding,
