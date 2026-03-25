@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Tiles.Core;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -8,10 +9,42 @@ namespace Tiles.Gameplay
     {
         private const string TargetSceneName = "SampleScene";
         private const string TileTextureResourcePath = "Tiles/tile_base";
+        private const string TileSymbolsResourcePath = "TileSymbols";
+        private const float TileIconSizeFactor = 0.58f;
         private const float Padding = 20f;
         private const float Gap = 8f;
         private const float HintDurationSeconds = 2f;
         private const int DefaultTrayCapacity = 7;
+
+        private static readonly Dictionary<TileType, string> TileSymbolFileByType = new Dictionary<TileType, string>
+        {
+            { TileType.A, "itemicon_s_arrow" },
+            { TileType.B, "itemicon_s_bomb" },
+            { TileType.C, "itemicon_s_chest" },
+            { TileType.D, "itemicon_s_energy" },
+            { TileType.E, "itemicon_s_gem_1" },
+            { TileType.F, "itemicon_s_gem_2" },
+            { TileType.G, "itemicon_s_gem_3" },
+            { TileType.H, "itemicon_s_gem_4" },
+            { TileType.I, "itemicon_s_gift" },
+            { TileType.J, "itemicon_s_gold_1" },
+            { TileType.K, "itemicon_s_gold_2" },
+            { TileType.L, "itemicon_s_gold_3" },
+            { TileType.M, "itemicon_s_gold_4" },
+            { TileType.N, "itemicon_s_hammer" },
+            { TileType.O, "itemicon_s_key" },
+            { TileType.P, "itemicon_s_life" },
+            { TileType.Q, "itemicon_s_lock" },
+            { TileType.R, "itemicon_s_medal" },
+            { TileType.S, "itemicon_s_mission" },
+            { TileType.T, "itemicon_s_postbox" },
+            { TileType.U, "itemicon_s_potion" },
+            { TileType.V, "itemicon_s_save_money" },
+            { TileType.W, "itemicon_s_setting" },
+            { TileType.X, "itemicon_s_shield" },
+            { TileType.Y, "itemicon_s_time" },
+            { TileType.Z, "itemicon_s_trophy" }
+        };
 
         private readonly TileGameCore _game = new TileGameCore();
 
@@ -30,6 +63,7 @@ namespace Tiles.Gameplay
         private float _uiScale = 1f;
         private float _styleScale = -1f;
         private Texture2D _tileTexture;
+        private readonly Dictionary<TileType, Texture2D> _tileSymbols = new Dictionary<TileType, Texture2D>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureControllerInSampleScene()
@@ -52,6 +86,7 @@ namespace Tiles.Gameplay
         private void Start()
         {
             _tileTexture = Resources.Load<Texture2D>(TileTextureResourcePath);
+            LoadTileSymbols();
             StartCurrentLevel();
         }
 
@@ -230,9 +265,9 @@ namespace Tiles.Gameplay
                     var isHint = _hintTileId.HasValue && _hintTileId.Value == tile.Id;
                     var previousColor = GUI.color;
                     GUI.color = GetTileColor(tile.Type, isFree, isHint);
-
-                    var label = GetTileShortCode(tile.Type);
-                    if (isHint)
+                    var symbolTexture = GetTileSymbolTexture(tile.Type);
+                    var label = symbolTexture == null ? GetTileShortCode(tile.Type) : string.Empty;
+                    if (isHint && symbolTexture == null)
                     {
                         label = "Hint\n" + label;
                     }
@@ -271,6 +306,11 @@ namespace Tiles.Gameplay
                         {
                             GUI.Box(tileRect, label, _tileStyle);
                         }
+                    }
+
+                    if (symbolTexture != null)
+                    {
+                        DrawCenteredTileSymbol(tileRect, symbolTexture);
                     }
 
                     GUI.color = previousColor;
@@ -345,9 +385,15 @@ namespace Tiles.Gameplay
                 if (i < _game.Tray.Count)
                 {
                     var type = _game.Tray[i];
+                    var symbolTexture = GetTileSymbolTexture(type);
+                    var label = symbolTexture == null ? GetTileShortCode(type) : string.Empty;
                     var previousColor = GUI.color;
                     GUI.color = GetTileColor(type, true, false);
-                    GUI.Box(slotRect, GetTileShortCode(type), _trayStyle);
+                    GUI.Box(slotRect, label, _trayStyle);
+                    if (symbolTexture != null)
+                    {
+                        DrawCenteredTileSymbol(slotRect, symbolTexture);
+                    }
                     GUI.color = previousColor;
                 }
                 else
@@ -432,7 +478,7 @@ namespace Tiles.Gameplay
             }
 
             var tileCount = 12 + (levelIndex * 6);
-            var symbolsCount = Mathf.Min(4 + levelIndex, 10);
+            var symbolsCount = Mathf.Min(4 + levelIndex, 26);
             var groupsCount = tileCount / 3;
             if (symbolsCount > groupsCount)
             {
@@ -476,33 +522,49 @@ namespace Tiles.Gameplay
             return color;
         }
 
+        private void LoadTileSymbols()
+        {
+            _tileSymbols.Clear();
+            foreach (var pair in TileSymbolFileByType)
+            {
+                var texture = Resources.Load<Texture2D>(TileSymbolsResourcePath + "/" + pair.Value);
+                if (texture != null)
+                {
+                    _tileSymbols[pair.Key] = texture;
+                }
+            }
+        }
+
+        private Texture2D GetTileSymbolTexture(TileType tileType)
+        {
+            Texture2D texture;
+            return _tileSymbols.TryGetValue(tileType, out texture) ? texture : null;
+        }
+
+        private void DrawCenteredTileSymbol(Rect hostRect, Texture2D symbolTexture)
+        {
+            if (symbolTexture == null)
+            {
+                return;
+            }
+
+            var iconSize = Mathf.Min(hostRect.width, hostRect.height) * TileIconSizeFactor;
+            if (iconSize <= 0f)
+            {
+                return;
+            }
+
+            var iconRect = new Rect(
+                hostRect.x + ((hostRect.width - iconSize) * 0.5f),
+                hostRect.y + ((hostRect.height - iconSize) * 0.5f),
+                iconSize,
+                iconSize);
+            GUI.DrawTexture(iconRect, symbolTexture, ScaleMode.ScaleToFit, true);
+        }
+
         private static string GetTileShortCode(TileType tileType)
         {
-            switch (tileType)
-            {
-                case TileType.Apple:
-                    return "A";
-                case TileType.Ball:
-                    return "B";
-                case TileType.Cat:
-                    return "C";
-                case TileType.Diamond:
-                    return "D";
-                case TileType.Flower:
-                    return "F";
-                case TileType.Gift:
-                    return "G";
-                case TileType.Heart:
-                    return "H";
-                case TileType.IceCream:
-                    return "I";
-                case TileType.Jelly:
-                    return "J";
-                case TileType.Key:
-                    return "K";
-                default:
-                    return "?";
-            }
+            return tileType.ToString();
         }
 
         private void EnsureStyles()
