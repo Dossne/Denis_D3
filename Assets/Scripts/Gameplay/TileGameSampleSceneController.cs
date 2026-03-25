@@ -10,11 +10,14 @@ namespace Tiles.Gameplay
         private const string TargetSceneName = "SampleScene";
         private const string TileTextureResourcePath = "Tiles/tile_base";
         private const string TileSymbolsResourcePath = "TileSymbols";
+        private const string LevelsResourcePath = "Levels/";
         private const float TileIconSizeFactor = 0.58f;
         private const float Padding = 20f;
         private const float Gap = 8f;
         private const float HintDurationSeconds = 2f;
         private const int DefaultTrayCapacity = 7;
+        private const int MaxSymbolsOnLevel = 26;
+        private const int MaxStackHeightPerSector = 9;
         private const int BoardColumns = 6;
         private const int BoardRows = 6;
         private const int MaxStacksPerLayer = BoardColumns * BoardRows;
@@ -461,33 +464,87 @@ namespace Tiles.Gameplay
             _hintTileId = null;
             _hintExpiresAt = 0f;
 
-            var definition = BuildLevelDefinition(_currentLevelIndex);
+            var definition = LoadLevelDefinition(_currentLevelIndex + 1);
             _game.StartLevel(definition, seed: _currentLevelIndex + 1);
         }
 
-        private LevelDefinition BuildLevelDefinition(int levelIndex)
+        private LevelDefinition LoadLevelDefinition(int levelNumber)
         {
-            if (levelIndex <= 0)
+            var levelId = levelNumber.ToString("000");
+            var levelAsset = Resources.Load<TextAsset>(LevelsResourcePath + levelId);
+            if (levelAsset == null)
             {
-                return LevelDefinition.CreateFirstLevel();
+                throw new System.InvalidOperationException(
+                    "Level file not found: Assets/Resources/Levels/" + levelId + ".json");
             }
 
-            var tileCount = 12 + (levelIndex * 6);
-            var symbolsCount = Mathf.Min(4 + levelIndex, 26);
+            var levelData = JsonUtility.FromJson<TileLevelFileData>(levelAsset.text);
+            if (levelData == null)
+            {
+                throw new System.InvalidOperationException("Failed to parse level JSON for ID " + levelId + ".");
+            }
+
+            if (levelData.sectorStacks == null || levelData.sectorStacks.Length != MaxStacksPerLayer)
+            {
+                throw new System.InvalidOperationException(
+                    "Level " + levelId + " must contain exactly 36 values in sectorStacks.");
+            }
+
+            var tileCount = 0;
+            var layerCount = 0;
+            var startingFreeTiles = 0;
+            for (var i = 0; i < levelData.sectorStacks.Length; i++)
+            {
+                var stackHeight = levelData.sectorStacks[i];
+                if (stackHeight < 0 || stackHeight > MaxStackHeightPerSector)
+                {
+                    throw new System.InvalidOperationException(
+                        "Level " + levelId + " contains invalid stack height " + stackHeight + ". Allowed: 0..9.");
+                }
+
+                tileCount += stackHeight;
+                if (stackHeight > layerCount)
+                {
+                    layerCount = stackHeight;
+                }
+
+                if (stackHeight > 0)
+                {
+                    startingFreeTiles++;
+                }
+            }
+
+            if (tileCount <= 0)
+            {
+                throw new System.InvalidOperationException("Level " + levelId + " must contain at least one tile.");
+            }
+
+            if (tileCount % 3 != 0)
+            {
+                throw new System.InvalidOperationException("Level " + levelId + " tile count must be divisible by 3.");
+            }
+
+            var symbolsCount = levelData.symbolsCount;
+            if (symbolsCount < 1 || symbolsCount > MaxSymbolsOnLevel)
+            {
+                throw new System.InvalidOperationException(
+                    "Level " + levelId + " symbolsCount must be between 1 and " + MaxSymbolsOnLevel + ".");
+            }
+
             var groupsCount = tileCount / 3;
             if (symbolsCount > groupsCount)
             {
-                symbolsCount = groupsCount;
+                throw new System.InvalidOperationException(
+                    "Level " + levelId + " symbolsCount cannot exceed tileCount/3.");
             }
 
-            var layerCount = 2;
-            while ((tileCount % layerCount != 0) || ((tileCount / layerCount) > MaxStacksPerLayer))
-            {
-                layerCount++;
-            }
-
-            var startingFreeTiles = tileCount / layerCount;
-            return new LevelDefinition(tileCount, symbolsCount, layerCount, startingFreeTiles, DefaultTrayCapacity);
+            return new LevelDefinition(
+                tileCount,
+                symbolsCount,
+                layerCount,
+                startingFreeTiles,
+                DefaultTrayCapacity,
+                levelData.sectorStacks);
         }
 
         private int CountTilesLeft()

@@ -41,4 +41,11 @@ namespace Tiles.Core
                 trayCapacity: 7);
         }
     }
+
+    [System.Serializable]
+    public sealed class TileLevelFileData
+    {
+        public int symbolsCount;
+        public int[] sectorStacks;
+    }
 }
