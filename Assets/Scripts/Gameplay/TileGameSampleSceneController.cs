@@ -7,8 +7,8 @@ namespace Tiles.Gameplay
     public sealed class TileGameSampleSceneController : MonoBehaviour
     {
         private const string TargetSceneName = "SampleScene";
-        private const float Padding = 16f;
-        private const float Gap = 6f;
+        private const float Padding = 20f;
+        private const float Gap = 8f;
         private const float HintDurationSeconds = 2f;
         private const int DefaultTrayCapacity = 7;
 
@@ -23,6 +23,8 @@ namespace Tiles.Gameplay
         private GUIStyle _tileStyle;
         private GUIStyle _trayStyle;
         private GUIStyle _buttonStyle;
+        private float _uiScale = 1f;
+        private float _styleScale = -1f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureControllerInSampleScene()
@@ -49,6 +51,7 @@ namespace Tiles.Gameplay
 
         private void OnGUI()
         {
+            _uiScale = Mathf.Clamp((float)Screen.height / 1920f, 0.9f, 1.15f);
             EnsureStyles();
 
             if (_hintTileId.HasValue && Time.unscaledTime > _hintExpiresAt)
@@ -56,26 +59,28 @@ namespace Tiles.Gameplay
                 _hintTileId = null;
             }
 
-            var topHeight = 58f;
-            var controlsHeight = 56f;
-            var trayHeight = 110f;
+            var padding = Scale(Padding);
+            var topHeight = Scale(76f);
+            var controlsHeight = Scale(72f);
+            var trayHeight = Scale(142f);
 
-            var topRect = new Rect(Padding, Padding, Screen.width - (Padding * 2f), topHeight);
+            var topRect = new Rect(padding, padding, Screen.width - (padding * 2f), topHeight);
             var controlsRect = new Rect(
-                Padding,
-                Screen.height - trayHeight - controlsHeight - (Padding * 2f),
-                Screen.width - (Padding * 2f),
+                padding,
+                Screen.height - trayHeight - controlsHeight - (padding * 2f),
+                Screen.width - (padding * 2f),
                 controlsHeight);
             var trayRect = new Rect(
-                Padding,
-                Screen.height - trayHeight - Padding,
-                Screen.width - (Padding * 2f),
+                padding,
+                Screen.height - trayHeight - padding,
+                Screen.width - (padding * 2f),
                 trayHeight);
+            var boardHeight = controlsRect.yMin - topRect.yMax - (padding * 2f);
             var boardRect = new Rect(
-                Padding,
-                topRect.yMax + Padding,
-                Screen.width - (Padding * 2f),
-                controlsRect.yMin - topRect.yMax - (Padding * 2f));
+                padding,
+                topRect.yMax + padding,
+                Screen.width - (padding * 2f),
+                Mathf.Max(Scale(8f), boardHeight));
 
             DrawTop(topRect);
             DrawBoard(boardRect);
@@ -93,14 +98,24 @@ namespace Tiles.Gameplay
             var tilesLeft = CountTilesLeft();
             var infoText = "Tiles left: " + tilesLeft;
 
-            GUI.Label(new Rect(rect.x + 10f, rect.y + 8f, rect.width * 0.4f, 24f), levelText, _titleStyle);
-            GUI.Label(new Rect(rect.x + 10f, rect.y + 30f, rect.width * 0.4f, 22f), infoText, _statusStyle);
-            GUI.Label(new Rect(rect.x + rect.width * 0.45f, rect.y + 16f, rect.width * 0.5f, 24f), statusText, _statusStyle);
+            GUI.Label(
+                new Rect(rect.x + Scale(12f), rect.y + Scale(10f), rect.width * 0.44f, Scale(34f)),
+                levelText,
+                _titleStyle);
+            GUI.Label(
+                new Rect(rect.x + Scale(12f), rect.y + Scale(44f), rect.width * 0.44f, Scale(28f)),
+                infoText,
+                _statusStyle);
+            GUI.Label(
+                new Rect(rect.x + rect.width * 0.5f, rect.y + Scale(24f), rect.width * 0.46f, Scale(30f)),
+                statusText,
+                _statusStyle);
         }
 
         private void DrawBoard(Rect rect)
         {
             GUI.Box(rect, string.Empty);
+            var gap = Scale(Gap);
 
             var maxLayer = -1;
             var maxColumn = -1;
@@ -139,24 +154,24 @@ namespace Tiles.Gameplay
             var columnsCount = maxColumn + 1;
             var rowsCount = maxRow + 1;
 
-            var perLayerHeader = 18f;
-            var layerGap = 10f;
+            var perLayerHeader = Scale(24f);
+            var layerGap = Scale(10f);
             var totalHeaderHeight = layersCount * perLayerHeader;
             var totalLayerGapHeight = (layersCount - 1) * layerGap;
-            var availableGridHeight = rect.height - totalHeaderHeight - totalLayerGapHeight - 10f;
+            var availableGridHeight = rect.height - totalHeaderHeight - totalLayerGapHeight - Scale(10f);
             var gridHeightPerLayer = Mathf.Max(1f, availableGridHeight / layersCount);
             var tileSize = Mathf.Min(
-                (rect.width - ((columnsCount - 1) * Gap) - 12f) / columnsCount,
-                (gridHeightPerLayer - ((rowsCount - 1) * Gap)) / rowsCount);
-            tileSize = Mathf.Max(24f, tileSize);
+                (rect.width - ((columnsCount - 1) * gap) - Scale(12f)) / columnsCount,
+                (gridHeightPerLayer - ((rowsCount - 1) * gap)) / rowsCount);
+            tileSize = Mathf.Max(Scale(28f), tileSize);
 
             for (var layerOffset = 0; layerOffset < layersCount; layerOffset++)
             {
                 var layer = maxLayer - layerOffset;
-                var layerTop = rect.y + 6f + layerOffset * (perLayerHeader + gridHeightPerLayer + layerGap);
+                var layerTop = rect.y + Scale(6f) + layerOffset * (perLayerHeader + gridHeightPerLayer + layerGap);
 
                 GUI.Label(
-                    new Rect(rect.x + 8f, layerTop, rect.width - 16f, perLayerHeader),
+                    new Rect(rect.x + Scale(8f), layerTop, rect.width - Scale(16f), perLayerHeader),
                     "Layer " + (layer + 1),
                     _statusStyle);
 
@@ -170,8 +185,8 @@ namespace Tiles.Gameplay
                     }
 
                     var tileRect = new Rect(
-                        rect.x + 6f + tile.Column * (tileSize + Gap),
-                        gridTop + tile.Row * (tileSize + Gap),
+                        rect.x + Scale(6f) + tile.Column * (tileSize + gap),
+                        gridTop + tile.Row * (tileSize + gap),
                         tileSize,
                         tileSize);
 
@@ -207,14 +222,15 @@ namespace Tiles.Gameplay
         private void DrawControls(Rect rect)
         {
             GUI.Box(rect, string.Empty);
+            var gap = Scale(Gap);
 
-            var buttonWidth = (rect.width - (Gap * 2f) - 20f) / 3f;
-            var buttonHeight = rect.height - 16f;
-            var buttonY = rect.y + 8f;
+            var buttonWidth = (rect.width - (gap * 2f) - Scale(20f)) / 3f;
+            var buttonHeight = Mathf.Max(48f, rect.height - Scale(16f));
+            var buttonY = rect.y + ((rect.height - buttonHeight) * 0.5f);
 
-            var undoRect = new Rect(rect.x + 8f, buttonY, buttonWidth, buttonHeight);
-            var hintRect = new Rect(undoRect.xMax + Gap, buttonY, buttonWidth, buttonHeight);
-            var restartRect = new Rect(hintRect.xMax + Gap, buttonY, buttonWidth, buttonHeight);
+            var undoRect = new Rect(rect.x + Scale(8f), buttonY, buttonWidth, buttonHeight);
+            var hintRect = new Rect(undoRect.xMax + gap, buttonY, buttonWidth, buttonHeight);
+            var restartRect = new Rect(hintRect.xMax + gap, buttonY, buttonWidth, buttonHeight);
 
             var oldEnabled = GUI.enabled;
 
@@ -248,19 +264,20 @@ namespace Tiles.Gameplay
         private void DrawTray(Rect rect)
         {
             GUI.Box(rect, string.Empty);
+            var gap = Scale(Gap);
             GUI.Label(
-                new Rect(rect.x + 8f, rect.y + 6f, rect.width - 16f, 24f),
+                new Rect(rect.x + Scale(10f), rect.y + Scale(8f), rect.width - Scale(20f), Scale(30f)),
                 "Tray " + _game.Tray.Count + "/" + _game.TrayCapacity,
                 _statusStyle);
 
             var capacity = _game.TrayCapacity > 0 ? _game.TrayCapacity : DefaultTrayCapacity;
-            var slotsTop = rect.y + 32f;
-            var slotSize = Mathf.Min(72f, (rect.width - ((capacity - 1) * Gap) - 12f) / capacity);
+            var slotsTop = rect.y + Scale(42f);
+            var slotSize = Mathf.Min(Scale(88f), (rect.width - ((capacity - 1) * gap) - Scale(12f)) / capacity);
 
             for (var i = 0; i < capacity; i++)
             {
                 var slotRect = new Rect(
-                    rect.x + 6f + i * (slotSize + Gap),
+                    rect.x + Scale(6f) + i * (slotSize + gap),
                     slotsTop,
                     slotSize,
                     slotSize);
@@ -287,8 +304,8 @@ namespace Tiles.Gameplay
                 return;
             }
 
-            var panelWidth = Mathf.Min(360f, Screen.width - 40f);
-            var panelHeight = 170f;
+            var panelWidth = Mathf.Min(Scale(420f), Screen.width - Scale(40f));
+            var panelHeight = Scale(220f);
             var panelRect = new Rect(
                 (Screen.width - panelWidth) * 0.5f,
                 (Screen.height - panelHeight) * 0.5f,
@@ -300,8 +317,18 @@ namespace Tiles.Gameplay
             var title = _game.Status == GameStatus.Won ? "WIN" : "LOSE";
             var action = _game.Status == GameStatus.Won ? "Next Level" : "Try Again";
 
-            GUI.Label(new Rect(panelRect.x, panelRect.y + 20f, panelRect.width, 32f), title, _titleStyle);
-            if (GUI.Button(new Rect(panelRect.x + 30f, panelRect.y + 78f, panelRect.width - 60f, 52f), action, _buttonStyle))
+            GUI.Label(
+                new Rect(panelRect.x, panelRect.y + Scale(24f), panelRect.width, Scale(44f)),
+                title,
+                _titleStyle);
+            if (GUI.Button(
+                    new Rect(
+                        panelRect.x + Scale(30f),
+                        panelRect.y + Scale(112f),
+                        panelRect.width - Scale(60f),
+                        Mathf.Max(48f, Scale(68f))),
+                    action,
+                    _buttonStyle))
             {
                 if (_game.Status == GameStatus.Won)
                 {
@@ -404,44 +431,55 @@ namespace Tiles.Gameplay
 
         private void EnsureStyles()
         {
-            if (_titleStyle != null)
+            if (_titleStyle != null && Mathf.Abs(_styleScale - _uiScale) < 0.01f)
             {
                 return;
             }
+            _styleScale = _uiScale;
 
             _titleStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = 24,
+                fontSize = ScaleFont(30),
                 fontStyle = FontStyle.Bold
             };
 
             _statusStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleLeft,
-                fontSize = 16
+                fontSize = ScaleFont(20)
             };
 
             _tileStyle = new GUIStyle(GUI.skin.button)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = 16,
+                fontSize = ScaleFont(20),
                 fontStyle = FontStyle.Bold
             };
 
             _trayStyle = new GUIStyle(GUI.skin.box)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = 15,
+                fontSize = ScaleFont(19),
                 fontStyle = FontStyle.Bold
             };
 
             _buttonStyle = new GUIStyle(GUI.skin.button)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = 18,
+                fontSize = ScaleFont(22),
                 fontStyle = FontStyle.Bold
             };
+        }
+
+        private float Scale(float value)
+        {
+            return value * _uiScale;
+        }
+
+        private int ScaleFont(int fontSize)
+        {
+            return Mathf.Max(10, Mathf.RoundToInt(fontSize * _uiScale));
         }
     }
 }
