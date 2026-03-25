@@ -66,7 +66,8 @@ namespace Tiles.Gameplay
             var padding = Scale(Padding);
             var topHeight = Scale(76f);
             var controlsHeight = Scale(72f);
-            var trayHeight = Scale(142f);
+            const float trayHeightMultiplier = 1.4f;
+            var trayHeight = Scale(142f * trayHeightMultiplier);
             var traySideMargin = Scale(8f);
             var trayBottomMargin = Scale(8f);
             var controlsToTrayGap = Scale(8f);
@@ -302,7 +303,7 @@ namespace Tiles.Gameplay
 
             var capacity = _game.TrayCapacity > 0 ? _game.TrayCapacity : DefaultTrayCapacity;
             var slotsTop = rect.y + Scale(42f);
-            var slotSize = Mathf.Min(Scale(88f), (rect.width - ((capacity - 1) * gap) - Scale(12f)) / capacity);
+            var slotSize = Mathf.Min(Scale(123f), (rect.width - ((capacity - 1) * gap) - Scale(12f)) / capacity);
 
             for (var i = 0; i < capacity; i++)
             {
