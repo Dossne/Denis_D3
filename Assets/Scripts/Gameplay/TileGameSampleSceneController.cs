@@ -195,32 +195,23 @@ namespace Tiles.Gameplay
                 return;
             }
 
-            var layersCount = maxLayer + 1;
             var columnsCount = maxColumn + 1;
             var rowsCount = maxRow + 1;
-
-            var perLayerHeader = Scale(24f);
-            var layerGap = Scale(10f);
-            var totalHeaderHeight = layersCount * perLayerHeader;
-            var totalLayerGapHeight = (layersCount - 1) * layerGap;
-            var availableGridHeight = rect.height - totalHeaderHeight - totalLayerGapHeight - Scale(10f);
-            var gridHeightPerLayer = Mathf.Max(1f, availableGridHeight / layersCount);
+            var boardPadding = Scale(8f);
+            var availableGridWidth = rect.width - (boardPadding * 2f);
+            var availableGridHeight = rect.height - (boardPadding * 2f);
             var tileSize = Mathf.Min(
-                (rect.width - ((columnsCount - 1) * gap) - Scale(12f)) / columnsCount,
-                (gridHeightPerLayer - ((rowsCount - 1) * gap)) / rowsCount);
+                (availableGridWidth - ((columnsCount - 1) * gap)) / columnsCount,
+                (availableGridHeight - ((rowsCount - 1) * gap)) / rowsCount);
             tileSize = Mathf.Max(Scale(28f), tileSize);
 
-            for (var layerOffset = 0; layerOffset < layersCount; layerOffset++)
+            var gridWidth = columnsCount * tileSize + ((columnsCount - 1) * gap);
+            var gridHeight = rowsCount * tileSize + ((rowsCount - 1) * gap);
+            var gridLeft = rect.x + ((rect.width - gridWidth) * 0.5f);
+            var gridTop = rect.y + ((rect.height - gridHeight) * 0.5f);
+
+            for (var layer = 0; layer <= maxLayer; layer++)
             {
-                var layer = maxLayer - layerOffset;
-                var layerTop = rect.y + Scale(6f) + layerOffset * (perLayerHeader + gridHeightPerLayer + layerGap);
-
-                GUI.Label(
-                    new Rect(rect.x + Scale(8f), layerTop, rect.width - Scale(16f), perLayerHeader),
-                    "Layer " + (layer + 1),
-                    _statusStyle);
-
-                var gridTop = layerTop + perLayerHeader;
                 for (var i = 0; i < _game.Tiles.Count; i++)
                 {
                     var tile = _game.Tiles[i];
@@ -230,7 +221,7 @@ namespace Tiles.Gameplay
                     }
 
                     var tileRect = new Rect(
-                        rect.x + Scale(6f) + tile.Column * (tileSize + gap),
+                        gridLeft + tile.Column * (tileSize + gap),
                         gridTop + tile.Row * (tileSize + gap),
                         tileSize,
                         tileSize);
