@@ -25,6 +25,8 @@ namespace Tiles.Gameplay
         private GUIStyle _trayStyle;
         private GUIStyle _buttonStyle;
         private GUIStyle _tileOverlayStyle;
+        private bool _isPortrait = true;
+        private bool _styleIsPortrait = true;
         private float _uiScale = 1f;
         private float _styleScale = -1f;
         private Texture2D _tileTexture;
@@ -55,7 +57,12 @@ namespace Tiles.Gameplay
 
         private void OnGUI()
         {
-            _uiScale = Mathf.Clamp((float)Screen.height / 1920f, 0.9f, 1.15f);
+            _isPortrait = Screen.height >= Screen.width;
+            var referenceWidth = _isPortrait ? 1080f : 1920f;
+            var referenceHeight = _isPortrait ? 1920f : 1080f;
+            var scaleByWidth = (float)Screen.width / referenceWidth;
+            var scaleByHeight = (float)Screen.height / referenceHeight;
+            _uiScale = Mathf.Clamp(Mathf.Min(scaleByWidth, scaleByHeight), 0.8f, 1.15f);
             EnsureStyles();
 
             if (_hintTileId.HasValue && Time.unscaledTime > _hintExpiresAt)
@@ -63,27 +70,42 @@ namespace Tiles.Gameplay
                 _hintTileId = null;
             }
 
-            var padding = Scale(Padding);
-            var topHeight = Scale(76f);
-            var controlsHeight = Scale(72f);
+            var padding = _isPortrait ? Scale(Padding) : Scale(16f);
+            var topHeight = _isPortrait ? Scale(76f) : Scale(64f);
+            var controlsHeight = _isPortrait ? Scale(72f) : Scale(64f);
             const float trayHeightMultiplier = 1.4f;
             var trayHeight = Scale(142f * trayHeightMultiplier);
             var traySideMargin = Scale(8f);
             var trayBottomMargin = Scale(8f);
             var controlsToTrayGap = Scale(8f);
+            var minimumBoardHeight = Scale(140f);
+            var minimumTrayHeight = Scale(140f);
+            var minimumControlsHeight = Scale(52f);
 
             var topRect = new Rect(padding, padding, Screen.width - (padding * 2f), topHeight);
-            var trayRect = new Rect(
-                traySideMargin,
-                Screen.height - trayHeight - trayBottomMargin,
-                Screen.width - (traySideMargin * 2f),
-                trayHeight);
-            var controlsRect = new Rect(
-                padding,
-                trayRect.y - controlsHeight - controlsToTrayGap,
-                Screen.width - (padding * 2f),
-                controlsHeight);
+            var trayRect = new Rect();
+            var controlsRect = new Rect();
+
+            RecalculateBottomStack();
+
             var boardHeight = controlsRect.yMin - topRect.yMax - (padding * 2f);
+            if (boardHeight < minimumBoardHeight)
+            {
+                var missingHeight = minimumBoardHeight - boardHeight;
+                var trayReduce = Mathf.Min(missingHeight, Mathf.Max(0f, trayHeight - minimumTrayHeight));
+                trayHeight -= trayReduce;
+                missingHeight -= trayReduce;
+
+                if (missingHeight > 0f)
+                {
+                    var controlsReduce = Mathf.Min(missingHeight, Mathf.Max(0f, controlsHeight - minimumControlsHeight));
+                    controlsHeight -= controlsReduce;
+                }
+
+                RecalculateBottomStack();
+                boardHeight = controlsRect.yMin - topRect.yMax - (padding * 2f);
+            }
+
             var boardRect = new Rect(
                 padding,
                 topRect.yMax + padding,
@@ -94,7 +116,22 @@ namespace Tiles.Gameplay
             DrawBoard(boardRect);
             DrawControls(controlsRect);
             DrawTray(trayRect);
-            DrawOverlay();
+            DrawOverlay(topRect, controlsRect);
+
+            void RecalculateBottomStack()
+            {
+                trayRect = new Rect(
+                    traySideMargin,
+                    Screen.height - trayHeight - trayBottomMargin,
+                    Screen.width - (traySideMargin * 2f),
+                    trayHeight);
+
+                controlsRect = new Rect(
+                    padding,
+                    trayRect.y - controlsHeight - controlsToTrayGap,
+                    Screen.width - (padding * 2f),
+                    controlsHeight);
+            }
         }
 
         private void DrawTop(Rect rect)
@@ -303,7 +340,8 @@ namespace Tiles.Gameplay
 
             var capacity = _game.TrayCapacity > 0 ? _game.TrayCapacity : DefaultTrayCapacity;
             var slotsTop = rect.y + Scale(42f);
-            var slotSize = Mathf.Min(Scale(123f), (rect.width - ((capacity - 1) * gap) - Scale(12f)) / capacity);
+            var maxSlotSizeByHeight = Mathf.Max(Scale(24f), rect.height - Scale(48f));
+            var slotSize = Mathf.Min(maxSlotSizeByHeight, (rect.width - ((capacity - 1) * gap) - Scale(12f)) / capacity);
 
             for (var i = 0; i < capacity; i++)
             {
@@ -328,18 +366,27 @@ namespace Tiles.Gameplay
             }
         }
 
-        private void DrawOverlay()
+        private void DrawOverlay(Rect topRect, Rect controlsRect)
         {
             if (_game.Status == GameStatus.Playing)
             {
                 return;
             }
 
+            var safeTop = topRect.yMax + Scale(8f);
+            var safeBottom = controlsRect.yMin - Scale(8f);
+            var safeHeight = Mathf.Max(Scale(140f), safeBottom - safeTop);
+
             var panelWidth = Mathf.Min(Scale(420f), Screen.width - Scale(40f));
-            var panelHeight = Scale(220f);
+            var panelHeight = Mathf.Min(Scale(220f), safeHeight - Scale(8f));
+            panelHeight = Mathf.Max(Scale(140f), panelHeight);
+            var centerY = (safeTop + safeBottom) * 0.5f;
+            var panelY = centerY - (panelHeight * 0.5f);
+            panelY = Mathf.Clamp(panelY, safeTop, safeBottom - panelHeight);
+
             var panelRect = new Rect(
                 (Screen.width - panelWidth) * 0.5f,
-                (Screen.height - panelHeight) * 0.5f,
+                panelY,
                 panelWidth,
                 panelHeight);
 
@@ -348,16 +395,23 @@ namespace Tiles.Gameplay
             var title = _game.Status == GameStatus.Won ? "WIN" : "LOSE";
             var action = _game.Status == GameStatus.Won ? "Next Level" : "Try Again";
 
+            var titleRect = new Rect(panelRect.x, panelRect.y + Scale(20f), panelRect.width, Scale(44f));
             GUI.Label(
-                new Rect(panelRect.x, panelRect.y + Scale(24f), panelRect.width, Scale(44f)),
+                titleRect,
                 title,
                 _titleStyle);
+
+            var buttonHeight = Mathf.Max(48f, Mathf.Min(Scale(68f), panelRect.height - Scale(96f)));
+            var buttonY = panelRect.yMax - buttonHeight - Scale(20f);
+            var minimumButtonY = titleRect.yMax + Scale(8f);
+            buttonY = Mathf.Max(buttonY, minimumButtonY);
+
             if (GUI.Button(
                     new Rect(
                         panelRect.x + Scale(30f),
-                        panelRect.y + Scale(112f),
+                        buttonY,
                         panelRect.width - Scale(60f),
-                        Mathf.Max(48f, Scale(68f))),
+                        buttonHeight),
                     action,
                     _buttonStyle))
             {
@@ -462,50 +516,52 @@ namespace Tiles.Gameplay
 
         private void EnsureStyles()
         {
-            if (_titleStyle != null && Mathf.Abs(_styleScale - _uiScale) < 0.01f)
+            if (_titleStyle != null && Mathf.Abs(_styleScale - _uiScale) < 0.01f && _styleIsPortrait == _isPortrait)
             {
                 return;
             }
             _styleScale = _uiScale;
+            _styleIsPortrait = _isPortrait;
+            var landscapeTextFactor = _isPortrait ? 1f : 0.9f;
 
             _titleStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = ScaleFont(30),
+                fontSize = ScaleFont(30, landscapeTextFactor),
                 fontStyle = FontStyle.Bold
             };
 
             _statusStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleLeft,
-                fontSize = ScaleFont(20)
+                fontSize = ScaleFont(20, landscapeTextFactor)
             };
 
             _tileStyle = new GUIStyle(GUI.skin.button)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = ScaleFont(20),
+                fontSize = ScaleFont(20, landscapeTextFactor),
                 fontStyle = FontStyle.Bold
             };
 
             _trayStyle = new GUIStyle(GUI.skin.box)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = ScaleFont(19),
+                fontSize = ScaleFont(19, landscapeTextFactor),
                 fontStyle = FontStyle.Bold
             };
 
             _buttonStyle = new GUIStyle(GUI.skin.button)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = ScaleFont(22),
+                fontSize = ScaleFont(22, landscapeTextFactor),
                 fontStyle = FontStyle.Bold
             };
 
             _tileOverlayStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = ScaleFont(20),
+                fontSize = ScaleFont(20, landscapeTextFactor),
                 fontStyle = FontStyle.Bold
             };
             _tileOverlayStyle.normal.textColor = new Color(0.08f, 0.08f, 0.08f, 0.95f);
@@ -534,9 +590,9 @@ namespace Tiles.Gameplay
             return value * _uiScale;
         }
 
-        private int ScaleFont(int fontSize)
+        private int ScaleFont(int fontSize, float multiplier = 1f)
         {
-            return Mathf.Max(10, Mathf.RoundToInt(fontSize * _uiScale));
+            return Mathf.Max(10, Mathf.RoundToInt(fontSize * _uiScale * multiplier));
         }
     }
 }
