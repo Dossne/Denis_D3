@@ -15,6 +15,9 @@ namespace Tiles.Gameplay
         private const float Gap = 8f;
         private const float HintDurationSeconds = 2f;
         private const int DefaultTrayCapacity = 7;
+        private const int BoardColumns = 6;
+        private const int BoardRows = 6;
+        private const int MaxStacksPerLayer = BoardColumns * BoardRows;
         private static readonly Rect TileBaseCropUv = new Rect(0.15625f, 0.115234375f, 0.6875f, 0.7529296875f);
 
         private static readonly Dictionary<TileType, string> TileSymbolFileByType = new Dictionary<TileType, string>
@@ -198,9 +201,7 @@ namespace Tiles.Gameplay
             GUI.Box(rect, string.Empty);
             var gap = Scale(Gap);
 
-            var maxLayer = -1;
-            var maxColumn = -1;
-            var maxRow = -1;
+            var hasTilesLeft = false;
             for (var i = 0; i < _game.Tiles.Count; i++)
             {
                 var tile = _game.Tiles[i];
@@ -209,30 +210,18 @@ namespace Tiles.Gameplay
                     continue;
                 }
 
-                if (tile.Layer > maxLayer)
-                {
-                    maxLayer = tile.Layer;
-                }
-
-                if (tile.Column > maxColumn)
-                {
-                    maxColumn = tile.Column;
-                }
-
-                if (tile.Row > maxRow)
-                {
-                    maxRow = tile.Row;
-                }
+                hasTilesLeft = true;
+                break;
             }
 
-            if (maxLayer < 0)
+            if (!hasTilesLeft)
             {
                 GUI.Label(new Rect(rect.x + 12f, rect.y + 12f, rect.width - 24f, 24f), "Board cleared", _statusStyle);
                 return;
             }
 
-            var columnsCount = maxColumn + 1;
-            var rowsCount = maxRow + 1;
+            var columnsCount = BoardColumns;
+            var rowsCount = BoardRows;
             var boardPadding = Scale(8f);
             var availableGridWidth = rect.width - (boardPadding * 2f);
             var availableGridHeight = rect.height - (boardPadding * 2f);
@@ -243,6 +232,8 @@ namespace Tiles.Gameplay
 
             var gridWidth = columnsCount * tileSize + ((columnsCount - 1) * gap);
             var gridHeight = rowsCount * tileSize + ((rowsCount - 1) * gap);
+            var levelLayerCount = _game.CurrentLevel != null ? _game.CurrentLevel.LayerCount : 1;
+            var maxLayer = Mathf.Max(0, levelLayerCount - 1);
             var layerVisualStep = Mathf.Clamp(Scale(6f), Scale(3f), tileSize * 0.14f);
             var stackOffsetTotal = maxLayer * layerVisualStep;
             var stackHeight = gridHeight + stackOffsetTotal;
@@ -490,6 +481,11 @@ namespace Tiles.Gameplay
             }
 
             var layerCount = 2;
+            while ((tileCount % layerCount != 0) || ((tileCount / layerCount) > MaxStacksPerLayer))
+            {
+                layerCount++;
+            }
+
             var startingFreeTiles = tileCount / layerCount;
             return new LevelDefinition(tileCount, symbolsCount, layerCount, startingFreeTiles, DefaultTrayCapacity);
         }
