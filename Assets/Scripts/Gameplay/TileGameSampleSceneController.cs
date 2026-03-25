@@ -7,6 +7,7 @@ namespace Tiles.Gameplay
     public sealed class TileGameSampleSceneController : MonoBehaviour
     {
         private const string TargetSceneName = "SampleScene";
+        private const string TileTextureResourcePath = "Tiles/tile_base";
         private const float Padding = 20f;
         private const float Gap = 8f;
         private const float HintDurationSeconds = 2f;
@@ -23,8 +24,10 @@ namespace Tiles.Gameplay
         private GUIStyle _tileStyle;
         private GUIStyle _trayStyle;
         private GUIStyle _buttonStyle;
+        private GUIStyle _tileOverlayStyle;
         private float _uiScale = 1f;
         private float _styleScale = -1f;
+        private Texture2D _tileTexture;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureControllerInSampleScene()
@@ -46,6 +49,7 @@ namespace Tiles.Gameplay
 
         private void Start()
         {
+            _tileTexture = Resources.Load<Texture2D>(TileTextureResourcePath);
             StartCurrentLevel();
         }
 
@@ -192,8 +196,9 @@ namespace Tiles.Gameplay
 
                     var isFree = _game.IsTileFree(tile.Id);
                     var isHint = _hintTileId.HasValue && _hintTileId.Value == tile.Id;
+                    var tileColor = GetTileColor(tile.Type, isFree, isHint);
                     var previousColor = GUI.color;
-                    GUI.color = GetTileColor(tile.Type, isFree, isHint);
+                    GUI.color = tileColor;
 
                     var label = GetTileShortCode(tile.Type);
                     if (isHint)
@@ -201,17 +206,38 @@ namespace Tiles.Gameplay
                         label = "Hint\n" + label;
                     }
 
-                    if (isFree && _game.Status == GameStatus.Playing)
+                    if (_tileTexture != null)
                     {
-                        if (GUI.Button(tileRect, label, _tileStyle))
+                        GUI.DrawTexture(tileRect, _tileTexture, ScaleMode.StretchToFill, true);
+                        GUI.color = isFree ? Color.white : new Color(1f, 1f, 1f, 0.55f);
+
+                        if (isFree && _game.Status == GameStatus.Playing)
                         {
-                            _game.TrySelectTile(tile.Id);
-                            _hintTileId = null;
+                            if (GUI.Button(tileRect, label, _tileOverlayStyle))
+                            {
+                                _game.TrySelectTile(tile.Id);
+                                _hintTileId = null;
+                            }
+                        }
+                        else
+                        {
+                            GUI.Box(tileRect, label, _tileOverlayStyle);
                         }
                     }
                     else
                     {
-                        GUI.Box(tileRect, label, _tileStyle);
+                        if (isFree && _game.Status == GameStatus.Playing)
+                        {
+                            if (GUI.Button(tileRect, label, _tileStyle))
+                            {
+                                _game.TrySelectTile(tile.Id);
+                                _hintTileId = null;
+                            }
+                        }
+                        else
+                        {
+                            GUI.Box(tileRect, label, _tileStyle);
+                        }
                     }
 
                     GUI.color = previousColor;
@@ -470,6 +496,17 @@ namespace Tiles.Gameplay
                 fontSize = ScaleFont(22),
                 fontStyle = FontStyle.Bold
             };
+
+            _tileOverlayStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = ScaleFont(20),
+                fontStyle = FontStyle.Bold
+            };
+            _tileOverlayStyle.normal.textColor = new Color(0.08f, 0.08f, 0.08f, 0.95f);
+            _tileOverlayStyle.active.textColor = _tileOverlayStyle.normal.textColor;
+            _tileOverlayStyle.focused.textColor = _tileOverlayStyle.normal.textColor;
+            _tileOverlayStyle.hover.textColor = _tileOverlayStyle.normal.textColor;
         }
 
         private float Scale(float value)
