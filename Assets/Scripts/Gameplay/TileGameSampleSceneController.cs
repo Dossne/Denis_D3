@@ -15,6 +15,7 @@ namespace Tiles.Gameplay
         private const float Gap = 8f;
         private const float HintDurationSeconds = 2f;
         private const int DefaultTrayCapacity = 7;
+        private static readonly Rect TileBaseCropUv = new Rect(0.15625f, 0.115234375f, 0.6875f, 0.7529296875f);
 
         private static readonly Dictionary<TileType, string> TileSymbolFileByType = new Dictionary<TileType, string>
         {
@@ -278,8 +279,7 @@ namespace Tiles.Gameplay
 
                     if (_tileTexture != null)
                     {
-                        GUI.color = Color.white;
-                        GUI.DrawTexture(tileRect, _tileTexture, ScaleMode.StretchToFill, true);
+                        DrawCroppedTileBase(tileRect, Color.white);
                         DrawTileStateOverlay(tileRect, isFree, isHint);
                         GUI.color = Color.white;
 
@@ -571,6 +571,19 @@ namespace Tiles.Gameplay
             return tileType.ToString();
         }
 
+        private void DrawCroppedTileBase(Rect tileRect, Color tint)
+        {
+            if (_tileTexture == null)
+            {
+                return;
+            }
+
+            var previousColor = GUI.color;
+            GUI.color = tint;
+            GUI.DrawTextureWithTexCoords(tileRect, _tileTexture, TileBaseCropUv, true);
+            GUI.color = previousColor;
+        }
+
         private void EnsureStyles()
         {
             if (_titleStyle != null && Mathf.Abs(_styleScale - _uiScale) < 0.01f && _styleIsPortrait == _isPortrait)
@@ -629,17 +642,35 @@ namespace Tiles.Gameplay
 
         private void DrawTileStateOverlay(Rect tileRect, bool isFree, bool isHint)
         {
+            var previousColor = GUI.color;
+
             if (!isFree)
             {
-                GUI.color = new Color(0f, 0f, 0f, 0.28f);
-                GUI.DrawTexture(tileRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                if (_tileTexture != null)
+                {
+                    DrawCroppedTileBase(tileRect, new Color(0f, 0f, 0f, 0.28f));
+                }
+                else
+                {
+                    GUI.color = new Color(0f, 0f, 0f, 0.28f);
+                    GUI.DrawTexture(tileRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                }
             }
 
             if (isHint)
             {
-                GUI.color = new Color(1f, 0.92f, 0.35f, 0.25f);
-                GUI.DrawTexture(tileRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                if (_tileTexture != null)
+                {
+                    DrawCroppedTileBase(tileRect, new Color(1f, 0.92f, 0.35f, 0.25f));
+                }
+                else
+                {
+                    GUI.color = new Color(1f, 0.92f, 0.35f, 0.25f);
+                    GUI.DrawTexture(tileRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                }
             }
+
+            GUI.color = previousColor;
         }
 
         private float Scale(float value)
