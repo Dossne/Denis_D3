@@ -10,11 +10,13 @@ namespace Tiles.Gameplay
         private const string TargetSceneName = "SampleScene";
         private const string TileTextureResourcePath = "Tiles/tile_base";
         private const string TileSymbolsResourcePath = "TileSymbols";
+        private const string BgmResourcePath = "Music/tiles_main_theme";
         private const string LevelsResourcePath = "Levels/";
         private const float TileIconSizeFactor = 0.58f;
         private const float Padding = 20f;
         private const float Gap = 8f;
         private const float HintDurationSeconds = 2f;
+        private const float BgmVolume = 0.45f;
         private const int DefaultTrayCapacity = 7;
         private const int MaxSymbolsOnLevel = 26;
         private const int MaxStackHeightPerSector = 9;
@@ -70,6 +72,8 @@ namespace Tiles.Gameplay
         private float _uiScale = 1f;
         private float _styleScale = -1f;
         private Texture2D _tileTexture;
+        private AudioClip _bgmClip;
+        private AudioSource _bgmSource;
         private readonly Dictionary<TileType, Texture2D> _tileSymbols = new Dictionary<TileType, Texture2D>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -93,8 +97,34 @@ namespace Tiles.Gameplay
         private void Start()
         {
             _tileTexture = Resources.Load<Texture2D>(TileTextureResourcePath);
+            _bgmClip = Resources.Load<AudioClip>(BgmResourcePath);
+            _bgmSource = GetComponent<AudioSource>();
+            if (_bgmSource == null)
+            {
+                _bgmSource = gameObject.AddComponent<AudioSource>();
+            }
+
+            _bgmSource.playOnAwake = false;
+            _bgmSource.loop = true;
+            _bgmSource.spatialBlend = 0f;
+            _bgmSource.volume = BgmVolume;
+
+            if (_bgmClip == null)
+            {
+                Debug.LogError("BGM clip not found at Resources/" + BgmResourcePath + ".mp3");
+            }
+            else
+            {
+                _bgmSource.clip = _bgmClip;
+            }
+
             LoadTileSymbols();
             StartCurrentLevel();
+        }
+
+        private void Update()
+        {
+            SyncBackgroundMusic();
         }
 
         private void OnGUI()
@@ -197,6 +227,31 @@ namespace Tiles.Gameplay
                 new Rect(rect.x + rect.width * 0.5f, rect.y + Scale(24f), rect.width * 0.46f, Scale(30f)),
                 statusText,
                 _statusStyle);
+        }
+
+        private void SyncBackgroundMusic()
+        {
+            if (_bgmSource == null || _bgmClip == null)
+            {
+                return;
+            }
+
+            if (_game.Status == GameStatus.Playing)
+            {
+                if (_bgmSource.clip != _bgmClip)
+                {
+                    _bgmSource.clip = _bgmClip;
+                }
+
+                if (!_bgmSource.isPlaying)
+                {
+                    _bgmSource.Play();
+                }
+            }
+            else if (_bgmSource.isPlaying)
+            {
+                _bgmSource.Stop();
+            }
         }
 
         private void DrawBoard(Rect rect)
