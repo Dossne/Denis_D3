@@ -196,9 +196,8 @@ namespace Tiles.Gameplay
 
                     var isFree = _game.IsTileFree(tile.Id);
                     var isHint = _hintTileId.HasValue && _hintTileId.Value == tile.Id;
-                    var tileColor = GetTileColor(tile.Type, isFree, isHint);
                     var previousColor = GUI.color;
-                    GUI.color = tileColor;
+                    GUI.color = GetTileColor(tile.Type, isFree, isHint);
 
                     var label = GetTileShortCode(tile.Type);
                     if (isHint)
@@ -208,8 +207,10 @@ namespace Tiles.Gameplay
 
                     if (_tileTexture != null)
                     {
+                        GUI.color = Color.white;
                         GUI.DrawTexture(tileRect, _tileTexture, ScaleMode.StretchToFill, true);
-                        GUI.color = isFree ? Color.white : new Color(1f, 1f, 1f, 0.55f);
+                        DrawTileStateOverlay(tileRect, isFree, isHint);
+                        GUI.color = Color.white;
 
                         if (isFree && _game.Status == GameStatus.Playing)
                         {
@@ -507,6 +508,21 @@ namespace Tiles.Gameplay
             _tileOverlayStyle.active.textColor = _tileOverlayStyle.normal.textColor;
             _tileOverlayStyle.focused.textColor = _tileOverlayStyle.normal.textColor;
             _tileOverlayStyle.hover.textColor = _tileOverlayStyle.normal.textColor;
+        }
+
+        private void DrawTileStateOverlay(Rect tileRect, bool isFree, bool isHint)
+        {
+            if (!isFree)
+            {
+                GUI.color = new Color(0f, 0f, 0f, 0.28f);
+                GUI.DrawTexture(tileRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+            }
+
+            if (isHint)
+            {
+                GUI.color = new Color(1f, 0.92f, 0.35f, 0.25f);
+                GUI.DrawTexture(tileRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+            }
         }
 
         private float Scale(float value)
