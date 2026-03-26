@@ -38,7 +38,8 @@ namespace Tiles.Gameplay
         private const float MixVfxDurationSeconds = 0.26f;
         private const float MixFlashPhaseRatio = 0.44f;
         private const float MixSymbolPulseScale = 0.08f;
-        private const float StartScreenBlinkPeriodSeconds = 0.5f;
+        private const float StartScreenBlinkPeriodSeconds = 1f;
+        private const float StartScreenActionTextScale = 0.75f;
         private const float StartScreenMusicVolume = 0.5f;
         private const float BgmVolume = 0.45f;
         private const float TileTouchSfxVolume = 0.75f;
@@ -404,8 +405,8 @@ namespace Tiles.Gameplay
                 var scaleByWidth = _startScreenActionTextTexture.width > 0 ? maxWidth / _startScreenActionTextTexture.width : 1f;
                 var scaleByHeight = _startScreenActionTextTexture.height > 0 ? maxHeight / _startScreenActionTextTexture.height : 1f;
                 var scale = Mathf.Min(scaleByWidth, scaleByHeight);
-                var drawWidth = _startScreenActionTextTexture.width * scale;
-                var drawHeight = _startScreenActionTextTexture.height * scale;
+                var drawWidth = _startScreenActionTextTexture.width * scale * StartScreenActionTextScale;
+                var drawHeight = _startScreenActionTextTexture.height * scale * StartScreenActionTextScale;
                 var actionRect = new Rect(
                     (Screen.width - drawWidth) * 0.5f,
                     (Screen.height - drawHeight) * 0.5f,
