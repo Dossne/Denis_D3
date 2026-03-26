@@ -450,13 +450,24 @@ namespace Tiles.Gameplay
             GUI.Box(rect, string.Empty);
             var gap = Scale(Gap);
 
-            var buttonWidth = (rect.width - (gap * 2f) - Scale(20f)) / 3f;
-            var buttonHeight = Mathf.Max(48f, rect.height - Scale(16f));
-            var buttonY = rect.y + ((rect.height - buttonHeight) * 0.5f);
+            var maxButtonSizeByWidth = (rect.width - (gap * 2f) - Scale(16f)) / 3f;
+            var maxButtonSizeByHeight = rect.height - Scale(12f);
+            var buttonSize = Mathf.Min(maxButtonSizeByWidth, maxButtonSizeByHeight);
+            buttonSize = Mathf.Max(48f, buttonSize);
 
-            var undoRect = new Rect(rect.x + Scale(8f), buttonY, buttonWidth, buttonHeight);
-            var hintRect = new Rect(undoRect.xMax + gap, buttonY, buttonWidth, buttonHeight);
-            var restartRect = new Rect(hintRect.xMax + gap, buttonY, buttonWidth, buttonHeight);
+            var buttonsTotalWidth = (buttonSize * 3f) + (gap * 2f);
+            if (buttonsTotalWidth > rect.width)
+            {
+                buttonSize = Mathf.Max(1f, (rect.width - (gap * 2f)) / 3f);
+                buttonsTotalWidth = (buttonSize * 3f) + (gap * 2f);
+            }
+
+            var buttonsStartX = rect.x + ((rect.width - buttonsTotalWidth) * 0.5f);
+            var buttonY = rect.y + ((rect.height - buttonSize) * 0.5f);
+
+            var undoRect = new Rect(buttonsStartX, buttonY, buttonSize, buttonSize);
+            var hintRect = new Rect(undoRect.xMax + gap, buttonY, buttonSize, buttonSize);
+            var restartRect = new Rect(hintRect.xMax + gap, buttonY, buttonSize, buttonSize);
 
             var oldEnabled = GUI.enabled;
             var hasBlockingAnimation = HasTrayInteractionLock();
@@ -495,23 +506,17 @@ namespace Tiles.Gameplay
 
         private bool DrawControlButton(Rect buttonRect, Texture2D iconTexture, string fallbackLabel)
         {
-            var clicked = GUI.Button(buttonRect, iconTexture == null ? fallbackLabel : string.Empty, _buttonStyle);
             if (iconTexture == null)
             {
-                return clicked;
+                return GUI.Button(buttonRect, fallbackLabel, _buttonStyle);
             }
 
-            var iconInset = Mathf.Min(Scale(12f), Mathf.Min(buttonRect.width, buttonRect.height) * 0.22f);
-            var iconRect = new Rect(
-                buttonRect.x + iconInset,
-                buttonRect.y + iconInset,
-                Mathf.Max(1f, buttonRect.width - (iconInset * 2f)),
-                Mathf.Max(1f, buttonRect.height - (iconInset * 2f)));
+            var clicked = GUI.Button(buttonRect, GUIContent.none, GUIStyle.none);
 
             var previousColor = GUI.color;
             var iconAlpha = GUI.enabled ? 1f : 0.45f;
             GUI.color = new Color(1f, 1f, 1f, iconAlpha);
-            GUI.DrawTexture(iconRect, iconTexture, ScaleMode.ScaleToFit, true);
+            GUI.DrawTexture(buttonRect, iconTexture, ScaleMode.ScaleToFit, true);
             GUI.color = previousColor;
 
             return clicked;
