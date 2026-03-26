@@ -307,12 +307,14 @@ namespace Tiles.Gameplay
         {
             GUI.Box(rect, string.Empty);
             var gap = Scale(Gap);
+            var now = Time.unscaledTime;
+            var canSelectTiles = _game.Status == GameStatus.Playing && !HasActiveTrayShiftVfx();
 
             var hasTilesLeft = false;
             for (var i = 0; i < _game.Tiles.Count; i++)
             {
                 var tile = _game.Tiles[i];
-                if (tile.IsRemoved || _pendingTileIds.Contains(tile.Id))
+                if (tile.IsRemoved || IsPendingTileVisuallyRemoved(tile.Id, now))
                 {
                     continue;
                 }
@@ -353,7 +355,7 @@ namespace Tiles.Gameplay
                 for (var i = 0; i < _game.Tiles.Count; i++)
                 {
                     var tile = _game.Tiles[i];
-                    if (tile.IsRemoved || _pendingTileIds.Contains(tile.Id) || tile.Layer != layer)
+                    if (tile.IsRemoved || IsPendingTileVisuallyRemoved(tile.Id, now) || tile.Layer != layer)
                     {
                         continue;
                     }
@@ -364,7 +366,7 @@ namespace Tiles.Gameplay
                         tileSize,
                         tileSize);
 
-                    var isFree = IsTileFreeVisual(tile.Id);
+                    var isFree = IsTileFreeVisual(tile.Id, now);
                     var isHint = _hintTileId.HasValue && _hintTileId.Value == tile.Id;
                     var previousColor = GUI.color;
                     GUI.color = GetTileColor(tile.Type, isFree, isHint);
@@ -381,7 +383,7 @@ namespace Tiles.Gameplay
                         DrawTileStateOverlay(tileRect, isFree, isHint);
                         GUI.color = Color.white;
 
-                        if (isFree && _game.Status == GameStatus.Playing)
+                        if (isFree && canSelectTiles)
                         {
                             if (GUI.Button(tileRect, label, _tileOverlayStyle))
                             {
@@ -395,7 +397,7 @@ namespace Tiles.Gameplay
                     }
                     else
                     {
-                        if (isFree && _game.Status == GameStatus.Playing)
+                        if (isFree && canSelectTiles)
                         {
                             if (GUI.Button(tileRect, label, _tileStyle))
                             {
@@ -610,22 +612,26 @@ namespace Tiles.Gameplay
                 return;
             }
 
-            var shiftStartTime = Time.unscaledTime + TileBounceDurationSeconds + TileFlightDurationSeconds;
-            for (var sourceIndex = simulation.insertIndex; sourceIndex < _projectedTray.Count; sourceIndex++)
+            var now = Time.unscaledTime;
+            var hasShift = simulation.insertIndex < _projectedTray.Count;
+            if (hasShift)
             {
-                var destinationIndex = sourceIndex + 1;
-                if (destinationIndex >= capacity)
+                for (var sourceIndex = simulation.insertIndex; sourceIndex < _projectedTray.Count; sourceIndex++)
                 {
-                    continue;
-                }
+                    var destinationIndex = sourceIndex + 1;
+                    if (destinationIndex >= capacity)
+                    {
+                        continue;
+                    }
 
-                _activeTrayShiftVfx.Add(new TrayShiftVfx
-                {
-                    tileType = _projectedTray[sourceIndex],
-                    fromIndex = sourceIndex,
-                    toIndex = destinationIndex,
-                    startTime = shiftStartTime
-                });
+                    _activeTrayShiftVfx.Add(new TrayShiftVfx
+                    {
+                        tileType = _projectedTray[sourceIndex],
+                        fromIndex = sourceIndex,
+                        toIndex = destinationIndex,
+                        startTime = now
+                    });
+                }
             }
 
             _projectedTray.Clear();
@@ -638,7 +644,7 @@ namespace Tiles.Gameplay
                 tileType = tile.Type,
                 startRect = startRect,
                 targetRect = targetRect,
-                startTime = Time.unscaledTime,
+                startTime = now + (hasShift ? TrayShiftDurationSeconds : 0f),
                 sequence = _flightSequence++,
                 insertIndex = simulation.insertIndex,
                 matchedSlotIndicesBeforeRemoval = simulation.matchedSlotIndicesBeforeRemoval
@@ -1010,7 +1016,38 @@ namespace Tiles.Gameplay
             return value - Mathf.Floor(value);
         }
 
-        private bool IsTileFreeVisual(int tileId)
+        private bool TryGetActiveTileFlight(int tileId, out TileFlightAnimation flight)
+        {
+            for (var i = 0; i < _activeTileFlights.Count; i++)
+            {
+                if (_activeTileFlights[i].tileId == tileId)
+                {
+                    flight = _activeTileFlights[i];
+                    return true;
+                }
+            }
+
+            flight = null;
+            return false;
+        }
+
+        private bool IsPendingTileVisuallyRemoved(int tileId, float now)
+        {
+            if (!_pendingTileIds.Contains(tileId))
+            {
+                return false;
+            }
+
+            TileFlightAnimation flight;
+            if (!TryGetActiveTileFlight(tileId, out flight))
+            {
+                return true;
+            }
+
+            return now >= flight.startTime;
+        }
+
+        private bool IsTileFreeVisual(int tileId, float now)
         {
             if (_pendingTileIds.Contains(tileId))
             {
@@ -1035,7 +1072,7 @@ namespace Tiles.Gameplay
             for (var i = 0; i < _game.Tiles.Count; i++)
             {
                 var candidate = _game.Tiles[i];
-                if (candidate.Id == tileId || candidate.IsRemoved || _pendingTileIds.Contains(candidate.Id))
+                if (candidate.Id == tileId || candidate.IsRemoved || IsPendingTileVisuallyRemoved(candidate.Id, now))
                 {
                     continue;
                 }
@@ -1060,6 +1097,11 @@ namespace Tiles.Gameplay
             for (var i = 0; i < _activeTileFlights.Count; i++)
             {
                 var flight = _activeTileFlights[i];
+                if (now < flight.startTime)
+                {
+                    continue;
+                }
+
                 var flightRect = EvaluateFlightRect(flight, now);
                 DrawFlightTileVisual(flightRect, flight.tileType);
             }
