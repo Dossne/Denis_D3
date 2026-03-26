@@ -13,6 +13,7 @@ namespace Tiles.Gameplay
         private const string UndoButtonIconResourcePath = "UI/ControlButtons/Undo";
         private const string HintButtonIconResourcePath = "UI/ControlButtons/Hint";
         private const string RestartButtonIconResourcePath = "UI/ControlButtons/Mix";
+        private const string LevelBackgroundResourcePath = "UI/Backgrounds/level_background";
         private const string BgmResourcePath = "Music/tiles_main_theme";
         private const string LevelsResourcePath = "Levels/";
         private const float TileIconSizeFactor = 0.58f;
@@ -85,6 +86,7 @@ namespace Tiles.Gameplay
         private float _uiScale = 1f;
         private float _styleScale = -1f;
         private Texture2D _tileTexture;
+        private Texture2D _levelBackgroundTexture;
         private Texture2D _undoButtonTexture;
         private Texture2D _hintButtonTexture;
         private Texture2D _restartButtonTexture;
@@ -163,6 +165,7 @@ namespace Tiles.Gameplay
         private void Start()
         {
             _tileTexture = Resources.Load<Texture2D>(TileTextureResourcePath);
+            _levelBackgroundTexture = Resources.Load<Texture2D>(LevelBackgroundResourcePath);
             _undoButtonTexture = Resources.Load<Texture2D>(UndoButtonIconResourcePath);
             _hintButtonTexture = Resources.Load<Texture2D>(HintButtonIconResourcePath);
             _restartButtonTexture = Resources.Load<Texture2D>(RestartButtonIconResourcePath);
@@ -209,6 +212,15 @@ namespace Tiles.Gameplay
             var scaleByHeight = (float)Screen.height / referenceHeight;
             _uiScale = Mathf.Clamp(Mathf.Min(scaleByWidth, scaleByHeight), 0.8f, 1.15f);
             EnsureStyles();
+
+            if (_levelBackgroundTexture != null)
+            {
+                GUI.DrawTexture(
+                    new Rect(0f, 0f, Screen.width, Screen.height),
+                    _levelBackgroundTexture,
+                    ScaleMode.ScaleAndCrop,
+                    true);
+            }
 
             if (_hintTileId.HasValue && Time.unscaledTime > _hintExpiresAt)
             {
@@ -290,8 +302,6 @@ namespace Tiles.Gameplay
 
         private void DrawTop(Rect rect)
         {
-            GUI.Box(rect, string.Empty);
-
             var levelText = (_currentLevelIndex + 1).ToString();
             GUI.Label(rect, levelText, _titleStyle);
         }
@@ -323,7 +333,6 @@ namespace Tiles.Gameplay
 
         private void DrawBoard(Rect rect, Rect trayRect)
         {
-            GUI.Box(rect, string.Empty);
             var gap = Scale(Gap);
             var now = Time.unscaledTime;
             var canSelectTiles = _game.Status == GameStatus.Playing && !HasTrayInteractionLock();
@@ -440,7 +449,6 @@ namespace Tiles.Gameplay
 
         private void DrawControls(Rect rect)
         {
-            GUI.Box(rect, string.Empty);
             var gap = Scale(Gap);
 
             var maxButtonSizeByWidth = (rect.width - (gap * 2f) - Scale(16f)) / 3f;
@@ -517,7 +525,6 @@ namespace Tiles.Gameplay
 
         private void DrawTray(Rect rect)
         {
-            GUI.Box(rect, string.Empty);
             var gap = Scale(Gap);
 
             var capacity = GetTrayCapacity();
