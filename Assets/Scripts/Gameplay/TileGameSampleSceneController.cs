@@ -440,14 +440,27 @@ namespace Tiles.Gameplay
                     var type = _game.Tray[i];
                     var symbolTexture = GetTileSymbolTexture(type);
                     var label = symbolTexture == null ? GetTileShortCode(type) : string.Empty;
-                    var previousColor = GUI.color;
-                    GUI.color = GetTileColor(type, true, false);
-                    GUI.Box(slotRect, label, _trayStyle);
+
+                    if (_tileTexture != null)
+                    {
+                        DrawCroppedTileBase(slotRect, Color.white);
+                        if (!string.IsNullOrEmpty(label))
+                        {
+                            GUI.Label(slotRect, label, _trayStyle);
+                        }
+                    }
+                    else
+                    {
+                        var previousColor = GUI.color;
+                        GUI.color = GetTileColor(type, true, false);
+                        GUI.Box(slotRect, label, _trayStyle);
+                        GUI.color = previousColor;
+                    }
+
                     if (symbolTexture != null)
                     {
                         DrawCenteredTileSymbol(slotRect, symbolTexture);
                     }
-                    GUI.color = previousColor;
                 }
                 else
                 {
