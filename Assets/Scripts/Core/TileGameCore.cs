@@ -132,6 +132,45 @@ namespace Tiles.Core
             return true;
         }
 
+        public bool TryMixBoardSymbols()
+        {
+            if (Status != GameStatus.Playing)
+            {
+                return false;
+            }
+
+            var activeTiles = new List<TileModel>();
+            var shuffledTypes = new List<TileType>();
+            for (var i = 0; i < _tiles.Count; i++)
+            {
+                var tile = _tiles[i];
+                if (tile.IsRemoved)
+                {
+                    continue;
+                }
+
+                activeTiles.Add(tile);
+                shuffledTypes.Add(tile.Type);
+            }
+
+            if (activeTiles.Count <= 1)
+            {
+                return false;
+            }
+
+            SaveSnapshot();
+
+            var random = new Random();
+            Shuffle(shuffledTypes, random);
+            for (var i = 0; i < activeTiles.Count; i++)
+            {
+                activeTiles[i].SetType(shuffledTypes[i]);
+            }
+
+            UpdateStatus();
+            return true;
+        }
+
         public bool Undo()
         {
             if (_history.Count == 0)
@@ -225,12 +264,14 @@ namespace Tiles.Core
         private void SaveSnapshot()
         {
             var removed = new bool[_tiles.Count];
+            var tileTypes = new TileType[_tiles.Count];
             for (var i = 0; i < _tiles.Count; i++)
             {
                 removed[i] = _tiles[i].IsRemoved;
+                tileTypes[i] = _tiles[i].Type;
             }
 
-            _history.Push(new GameSnapshot(removed, new List<TileType>(_tray), Status));
+            _history.Push(new GameSnapshot(removed, tileTypes, new List<TileType>(_tray), Status));
         }
 
         private void Restore(GameSnapshot snapshot)
@@ -238,6 +279,7 @@ namespace Tiles.Core
             for (var i = 0; i < _tiles.Count; i++)
             {
                 _tiles[i].SetRemoved(snapshot.Removed[i]);
+                _tiles[i].SetType(snapshot.TileTypes[i]);
             }
 
             _tray.Clear();
@@ -497,14 +539,16 @@ namespace Tiles.Core
 
         private sealed class GameSnapshot
         {
-            public GameSnapshot(bool[] removed, List<TileType> tray, GameStatus status)
+            public GameSnapshot(bool[] removed, TileType[] tileTypes, List<TileType> tray, GameStatus status)
             {
                 Removed = removed;
+                TileTypes = tileTypes;
                 Tray = tray;
                 Status = status;
             }
 
             public bool[] Removed { get; }
+            public TileType[] TileTypes { get; }
             public List<TileType> Tray { get; }
             public GameStatus Status { get; }
         }
