@@ -1887,18 +1887,50 @@ namespace Tiles.Gameplay
 
             if (isHint)
             {
-                if (_tileTexture != null)
-                {
-                    DrawCroppedTileBase(tileRect, new Color(1f, 0.92f, 0.35f, 0.25f));
-                }
-                else
-                {
-                    GUI.color = new Color(1f, 0.92f, 0.35f, 0.25f);
-                    GUI.DrawTexture(tileRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
-                }
+                DrawHintGlow(tileRect);
             }
 
             GUI.color = previousColor;
+        }
+
+        private void DrawHintGlow(Rect tileRect)
+        {
+            var pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 7.5f);
+
+            DrawHintGlowLayer(
+                ExpandRect(tileRect, Scale(Mathf.Lerp(9f, 14f, pulse))),
+                new Color(0.35f, 0.9f, 1f, Mathf.Lerp(0.18f, 0.34f, pulse)));
+
+            DrawHintGlowLayer(
+                ExpandRect(tileRect, Scale(Mathf.Lerp(5f, 8f, pulse))),
+                new Color(0.72f, 0.96f, 1f, Mathf.Lerp(0.2f, 0.38f, pulse)));
+
+            DrawHintGlowLayer(
+                ExpandRect(tileRect, Scale(Mathf.Lerp(1f, 3f, pulse))),
+                new Color(1f, 1f, 1f, Mathf.Lerp(0.2f, 0.4f, pulse)));
+        }
+
+        private void DrawHintGlowLayer(Rect rect, Color color)
+        {
+            if (_tileTexture != null)
+            {
+                DrawCroppedTileBase(rect, color);
+                return;
+            }
+
+            var previousColor = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+            GUI.color = previousColor;
+        }
+
+        private static Rect ExpandRect(Rect rect, float amount)
+        {
+            return new Rect(
+                rect.x - amount,
+                rect.y - amount,
+                rect.width + amount * 2f,
+                rect.height + amount * 2f);
         }
 
         private float Scale(float value)
