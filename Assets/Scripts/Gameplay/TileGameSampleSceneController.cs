@@ -15,6 +15,7 @@ namespace Tiles.Gameplay
         private const string RestartButtonIconResourcePath = "UI/ControlButtons/Mix";
         private const string LevelBackgroundResourcePath = "UI/Backgrounds/level_background";
         private const string BgmResourcePath = "Music/tiles_main_theme";
+        private const string TileTouchSfxResourcePath = "Sfx/tile_touch";
         private const string LevelsResourcePath = "Levels/";
         private const float TileIconSizeFactor = 0.58f;
         private const float Padding = 20f;
@@ -34,6 +35,7 @@ namespace Tiles.Gameplay
         private const float MixFlashPhaseRatio = 0.44f;
         private const float MixSymbolPulseScale = 0.08f;
         private const float BgmVolume = 0.45f;
+        private const float TileTouchSfxVolume = 0.75f;
         private const int DefaultTrayCapacity = 7;
         private const int MaxSymbolsOnLevel = 26;
         private const int MaxStackHeightPerSector = 9;
@@ -95,7 +97,9 @@ namespace Tiles.Gameplay
         private Texture2D _hintButtonTexture;
         private Texture2D _restartButtonTexture;
         private AudioClip _bgmClip;
+        private AudioClip _tileTouchClip;
         private AudioSource _bgmSource;
+        private AudioSource _sfxSource;
         private readonly Dictionary<TileType, Texture2D> _tileSymbols = new Dictionary<TileType, Texture2D>();
         private readonly List<TileFlightAnimation> _activeTileFlights = new List<TileFlightAnimation>();
         private readonly List<TileFlightAnimation> _completedTileFlights = new List<TileFlightAnimation>();
@@ -177,6 +181,7 @@ namespace Tiles.Gameplay
             _hintButtonTexture = Resources.Load<Texture2D>(HintButtonIconResourcePath);
             _restartButtonTexture = Resources.Load<Texture2D>(RestartButtonIconResourcePath);
             _bgmClip = Resources.Load<AudioClip>(BgmResourcePath);
+            _tileTouchClip = Resources.Load<AudioClip>(TileTouchSfxResourcePath);
             _bgmSource = GetComponent<AudioSource>();
             if (_bgmSource == null)
             {
@@ -196,6 +201,17 @@ namespace Tiles.Gameplay
             {
                 _bgmSource.clip = _bgmClip;
             }
+
+            if (_tileTouchClip == null)
+            {
+                Debug.LogError("Tile touch SFX clip not found at Resources/" + TileTouchSfxResourcePath + ".mp3");
+            }
+
+            _sfxSource = gameObject.AddComponent<AudioSource>();
+            _sfxSource.playOnAwake = false;
+            _sfxSource.loop = false;
+            _sfxSource.spatialBlend = 0f;
+            _sfxSource.volume = TileTouchSfxVolume;
 
             LoadTileSymbols();
             StartCurrentLevel();
@@ -806,6 +822,17 @@ namespace Tiles.Gameplay
             });
 
             _hintTileId = null;
+            PlayTileTouchSfx();
+        }
+
+        private void PlayTileTouchSfx()
+        {
+            if (_sfxSource == null || _tileTouchClip == null)
+            {
+                return;
+            }
+
+            _sfxSource.PlayOneShot(_tileTouchClip);
         }
 
         private bool TryGetTraySlotRect(Rect trayRect, int slotIndex, out Rect slotRect)
