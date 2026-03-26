@@ -217,7 +217,7 @@ namespace Tiles.Gameplay
 
             var padding = _isPortrait ? Scale(Padding) : Scale(16f);
             var topHeight = _isPortrait ? Scale(76f) : Scale(64f);
-            var controlsHeight = _isPortrait ? Scale(72f) : Scale(64f);
+            var controlsHeight = _isPortrait ? Scale(216f) : Scale(192f);
             const float trayHeightMultiplier = 1.4f;
             var trayHeight = Scale(142f * trayHeightMultiplier);
             var traySideMargin = Scale(8f);
@@ -436,7 +436,7 @@ namespace Tiles.Gameplay
             var gap = Scale(Gap);
 
             var maxButtonSizeByWidth = (rect.width - (gap * 2f) - Scale(16f)) / 3f;
-            var maxButtonSizeByHeight = rect.height - Scale(12f);
+            var maxButtonSizeByHeight = rect.height - Scale(36f);
             var buttonSize = Mathf.Min(maxButtonSizeByWidth, maxButtonSizeByHeight);
             buttonSize = Mathf.Max(48f, buttonSize);
 
