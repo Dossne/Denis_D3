@@ -17,7 +17,7 @@ namespace Tiles.Gameplay
         private const string BgmResourcePath = "Music/tiles_main_theme";
         private const string TileTouchSfxResourcePath = "Sfx/tile_touch";
         private const string LevelsResourcePath = "Levels/";
-        private const float TileIconSizeFactor = 0.58f;
+        private const float TileIconSizeFactor = 0.696f;
         private const float Padding = 20f;
         private const float Gap = 8f;
         private const float HintDurationSeconds = 2f;
