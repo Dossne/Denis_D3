@@ -226,8 +226,14 @@ namespace Tiles.Gameplay
             var minimumBoardHeight = Scale(140f);
             var minimumTrayHeight = Scale(140f);
             var minimumControlsHeight = Scale(52f);
+            var safeTopInset = Mathf.Max(0f, Screen.height - Screen.safeArea.yMax);
+            var topExtraDrop = _isPortrait ? Scale(28f) : Scale(12f);
 
-            var topRect = new Rect(padding, padding, Screen.width - (padding * 2f), topHeight);
+            var topRect = new Rect(
+                padding,
+                safeTopInset + padding + topExtraDrop,
+                Screen.width - (padding * 2f),
+                topHeight);
             var trayRect = new Rect();
             var controlsRect = new Rect();
 
