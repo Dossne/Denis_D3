@@ -76,6 +76,7 @@ namespace Tiles.Gameplay
         private float _hintExpiresAt;
 
         private GUIStyle _titleStyle;
+        private GUIStyle _topLevelStyle;
         private GUIStyle _statusStyle;
         private GUIStyle _tileStyle;
         private GUIStyle _trayStyle;
@@ -303,7 +304,7 @@ namespace Tiles.Gameplay
         private void DrawTop(Rect rect)
         {
             var levelText = (_currentLevelIndex + 1).ToString();
-            GUI.Label(rect, levelText, _titleStyle);
+            GUI.Label(rect, levelText, _topLevelStyle);
         }
 
         private void SyncBackgroundMusic()
@@ -1818,6 +1819,13 @@ namespace Tiles.Gameplay
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontSize = ScaleFont(30, landscapeTextFactor),
+                fontStyle = FontStyle.Bold
+            };
+
+            _topLevelStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = ScaleFont(90, landscapeTextFactor),
                 fontStyle = FontStyle.Bold
             };
 
