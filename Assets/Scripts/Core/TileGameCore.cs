@@ -124,7 +124,8 @@ namespace Tiles.Core
             SaveSnapshot();
 
             tile.SetRemoved(true);
-            _tray.Add(tile.Type);
+            var insertIndex = FindTrayInsertIndex(_tray, tile.Type);
+            _tray.Insert(insertIndex, tile.Type);
             ResolveTrayMatches();
             UpdateStatus();
 
@@ -247,40 +248,34 @@ namespace Tiles.Core
 
         private void ResolveTrayMatches()
         {
-            var occurrences = new Dictionary<TileType, int>();
-            for (var i = 0; i < _tray.Count; i++)
+            for (var i = 0; i <= _tray.Count - MatchSize;)
             {
-                var tileType = _tray[i];
-                if (!occurrences.ContainsKey(tileType))
+                if (_tray[i] == _tray[i + 1] && _tray[i + 1] == _tray[i + 2])
                 {
-                    occurrences[tileType] = 0;
+                    _tray.RemoveRange(i, MatchSize);
+                    if (i > 0)
+                    {
+                        i--;
+                    }
+
+                    continue;
                 }
 
-                occurrences[tileType]++;
-            }
-
-            foreach (var pair in occurrences)
-            {
-                var matchesToRemove = pair.Value / MatchSize;
-                for (var matchIndex = 0; matchIndex < matchesToRemove; matchIndex++)
-                {
-                    RemoveFirstInTray(pair.Key);
-                    RemoveFirstInTray(pair.Key);
-                    RemoveFirstInTray(pair.Key);
-                }
+                i++;
             }
         }
 
-        private void RemoveFirstInTray(TileType type)
+        private static int FindTrayInsertIndex(IReadOnlyList<TileType> tray, TileType type)
         {
-            for (var i = 0; i < _tray.Count; i++)
+            for (var i = tray.Count - 1; i >= 0; i--)
             {
-                if (_tray[i] == type)
+                if (tray[i] == type)
                 {
-                    _tray.RemoveAt(i);
-                    return;
+                    return i + 1;
                 }
             }
+
+            return tray.Count;
         }
 
         private void UpdateStatus()

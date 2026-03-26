@@ -24,6 +24,7 @@ namespace Tiles.Gameplay
         private const float TrayMatchSparkDurationSeconds = 0.32f;
         private const float TrayMatchScaleEnd = 0.65f;
         private const int TrayMatchSparksPerTile = 10;
+        private const float TrayShiftDurationSeconds = 0.14f;
         private const float BgmVolume = 0.45f;
         private const int DefaultTrayCapacity = 7;
         private const int MaxSymbolsOnLevel = 26;
@@ -86,6 +87,8 @@ namespace Tiles.Gameplay
         private readonly List<TileFlightAnimation> _activeTileFlights = new List<TileFlightAnimation>();
         private readonly List<TileFlightAnimation> _completedTileFlights = new List<TileFlightAnimation>();
         private readonly HashSet<int> _pendingTileIds = new HashSet<int>();
+        private readonly List<TileType> _projectedTray = new List<TileType>();
+        private readonly List<TrayShiftVfx> _activeTrayShiftVfx = new List<TrayShiftVfx>();
         private readonly List<TrayMatchVfx> _activeTrayMatchVfx = new List<TrayMatchVfx>();
         private int _flightSequence;
         private int _trayMatchVfxSeed;
@@ -98,6 +101,16 @@ namespace Tiles.Gameplay
             public Rect targetRect;
             public float startTime;
             public int sequence;
+            public int insertIndex;
+            public int[] matchedSlotIndicesBeforeRemoval;
+        }
+
+        private sealed class TrayShiftVfx
+        {
+            public TileType tileType;
+            public int fromIndex;
+            public int toIndex;
+            public float startTime;
         }
 
         private sealed class TrayMatchVfx
@@ -157,6 +170,7 @@ namespace Tiles.Gameplay
         private void Update()
         {
             UpdateTileFlights();
+            UpdateTrayShiftVfx();
             UpdateTrayMatchVfx();
             SyncBackgroundMusic();
         }
@@ -418,7 +432,7 @@ namespace Tiles.Gameplay
             var restartRect = new Rect(hintRect.xMax + gap, buttonY, buttonWidth, buttonHeight);
 
             var oldEnabled = GUI.enabled;
-            var hasBlockingAnimation = HasActiveTileFlights() || HasActiveTrayMatchVfx();
+            var hasBlockingAnimation = HasActiveTileFlights() || HasActiveTrayShiftVfx() || HasActiveTrayMatchVfx();
             var canUseBoosters = _game.Status == GameStatus.Playing && !hasBlockingAnimation;
 
             GUI.enabled = _game.CanUndo && canUseBoosters;
@@ -426,6 +440,7 @@ namespace Tiles.Gameplay
             {
                 _game.Undo();
                 _hintTileId = null;
+                SyncProjectedTrayWithGame();
             }
 
             GUI.enabled = canUseBoosters;
@@ -478,6 +493,7 @@ namespace Tiles.Gameplay
                 }
             }
 
+            DrawTrayShiftVfx(rect);
             DrawTrayMatchVfx(rect);
         }
 
@@ -548,6 +564,11 @@ namespace Tiles.Gameplay
             return _activeTrayMatchVfx.Count > 0;
         }
 
+        private bool HasActiveTrayShiftVfx()
+        {
+            return _activeTrayShiftVfx.Count > 0;
+        }
+
         private bool HasActiveTileFlights()
         {
             return _activeTileFlights.Count > 0;
@@ -560,7 +581,56 @@ namespace Tiles.Gameplay
                 return;
             }
 
-            var targetRect = GetNextFlightTargetRect(trayRect);
+            if (!HasActiveTileFlights() && _pendingTileIds.Count == 0)
+            {
+                SyncProjectedTrayWithGame();
+            }
+
+            var simulation = SimulateTrayInsert(_projectedTray, tile.Type);
+            if (simulation == null)
+            {
+                return;
+            }
+
+            var capacity = GetTrayCapacity();
+            if (simulation.insertIndex < 0 || simulation.insertIndex >= capacity)
+            {
+                return;
+            }
+
+            var hasImmediateMatch = simulation.matchedSlotIndicesBeforeRemoval != null;
+            if (!hasImmediateMatch && simulation.trayAfterResolve.Count >= capacity && HasActiveTileFlights())
+            {
+                return;
+            }
+
+            Rect targetRect;
+            if (!TryGetTraySlotRect(trayRect, simulation.insertIndex, out targetRect))
+            {
+                return;
+            }
+
+            var shiftStartTime = Time.unscaledTime + TileBounceDurationSeconds + TileFlightDurationSeconds;
+            for (var sourceIndex = simulation.insertIndex; sourceIndex < _projectedTray.Count; sourceIndex++)
+            {
+                var destinationIndex = sourceIndex + 1;
+                if (destinationIndex >= capacity)
+                {
+                    continue;
+                }
+
+                _activeTrayShiftVfx.Add(new TrayShiftVfx
+                {
+                    tileType = _projectedTray[sourceIndex],
+                    fromIndex = sourceIndex,
+                    toIndex = destinationIndex,
+                    startTime = shiftStartTime
+                });
+            }
+
+            _projectedTray.Clear();
+            _projectedTray.AddRange(simulation.trayAfterResolve);
+
             _pendingTileIds.Add(tile.Id);
             _activeTileFlights.Add(new TileFlightAnimation
             {
@@ -569,24 +639,105 @@ namespace Tiles.Gameplay
                 startRect = startRect,
                 targetRect = targetRect,
                 startTime = Time.unscaledTime,
-                sequence = _flightSequence++
+                sequence = _flightSequence++,
+                insertIndex = simulation.insertIndex,
+                matchedSlotIndicesBeforeRemoval = simulation.matchedSlotIndicesBeforeRemoval
             });
 
             _hintTileId = null;
         }
 
-        private Rect GetNextFlightTargetRect(Rect trayRect)
+        private bool TryGetTraySlotRect(Rect trayRect, int slotIndex, out Rect slotRect)
         {
+            slotRect = new Rect();
             var capacity = GetTrayCapacity();
+            if (slotIndex < 0 || slotIndex >= capacity)
+            {
+                return false;
+            }
+
             var gap = Scale(Gap);
             float slotsTop;
             float slotSize;
             float slotsStartX;
             CalculateTrayLayoutMetrics(trayRect, capacity, gap, out slotsTop, out slotSize, out slotsStartX);
+            slotRect = BuildTraySlotRect(slotsStartX, slotsTop, slotSize, gap, slotIndex);
+            return true;
+        }
 
-            var virtualTrayCount = _game.Tray.Count + _activeTileFlights.Count;
-            var targetIndex = Mathf.Clamp(virtualTrayCount, 0, capacity - 1);
-            return BuildTraySlotRect(slotsStartX, slotsTop, slotSize, gap, targetIndex);
+        private sealed class TrayInsertSimulation
+        {
+            public int insertIndex;
+            public int[] matchedSlotIndicesBeforeRemoval;
+            public List<TileType> trayAfterResolve;
+        }
+
+        private static int FindTrayInsertIndex(IReadOnlyList<TileType> tray, TileType type)
+        {
+            for (var i = tray.Count - 1; i >= 0; i--)
+            {
+                if (tray[i] == type)
+                {
+                    return i + 1;
+                }
+            }
+
+            return tray.Count;
+        }
+
+        private static int[] FindFirstAdjacentMatchIndices(IReadOnlyList<TileType> tray)
+        {
+            for (var i = 0; i <= tray.Count - 3; i++)
+            {
+                if (tray[i] == tray[i + 1] && tray[i + 1] == tray[i + 2])
+                {
+                    return new[] { i, i + 1, i + 2 };
+                }
+            }
+
+            return null;
+        }
+
+        private static void ResolveAdjacentTrayMatches(List<TileType> tray)
+        {
+            for (var i = 0; i <= tray.Count - 3;)
+            {
+                if (tray[i] == tray[i + 1] && tray[i + 1] == tray[i + 2])
+                {
+                    tray.RemoveRange(i, 3);
+                    if (i > 0)
+                    {
+                        i--;
+                    }
+
+                    continue;
+                }
+
+                i++;
+            }
+        }
+
+        private static TrayInsertSimulation SimulateTrayInsert(IReadOnlyList<TileType> tray, TileType type)
+        {
+            var insertIndex = FindTrayInsertIndex(tray, type);
+            var trayAfterInsert = new List<TileType>(tray.Count + 1);
+            for (var i = 0; i < tray.Count; i++)
+            {
+                trayAfterInsert.Add(tray[i]);
+            }
+
+            trayAfterInsert.Insert(insertIndex, type);
+            var matchedSlotIndicesBeforeRemoval = FindFirstAdjacentMatchIndices(trayAfterInsert);
+
+            var trayAfterResolve = new List<TileType>(trayAfterInsert);
+            ResolveAdjacentTrayMatches(trayAfterResolve);
+
+            return new TrayInsertSimulation
+            {
+                insertIndex = insertIndex,
+                matchedSlotIndicesBeforeRemoval = matchedSlotIndicesBeforeRemoval,
+                trayAfterResolve = trayAfterResolve
+            };
         }
 
         private void UpdateTileFlights()
@@ -622,7 +773,6 @@ namespace Tiles.Gameplay
             {
                 var flight = _completedTileFlights[i];
                 _pendingTileIds.Remove(flight.tileId);
-                var beforeTray = new List<TileType>(_game.Tray);
                 if (!_game.TrySelectTile(flight.tileId))
                 {
                     Debug.LogWarning(
@@ -630,53 +780,15 @@ namespace Tiles.Gameplay
                     continue;
                 }
 
-                TryStartTrayMatchVfx(beforeTray, flight.tileType);
+                StartTrayMatchVfx(flight.tileType, flight.matchedSlotIndicesBeforeRemoval);
             }
+
+            RebuildProjectedTrayFromGameAndActiveFlights();
         }
 
-        private void TryStartTrayMatchVfx(IReadOnlyList<TileType> beforeTray, TileType selectedType)
+        private void StartTrayMatchVfx(TileType selectedType, int[] slotIndices)
         {
-            if (beforeTray == null)
-            {
-                return;
-            }
-
-            var beforeCount = beforeTray.Count;
-            var afterCount = _game.Tray.Count;
-            if (afterCount != beforeCount - 2)
-            {
-                return;
-            }
-
-            var trayAfterAdd = new List<TileType>(beforeCount + 1);
-            for (var i = 0; i < beforeCount; i++)
-            {
-                trayAfterAdd.Add(beforeTray[i]);
-            }
-            trayAfterAdd.Add(selectedType);
-
-            var matchedSlotIndices = new int[3];
-            var foundCount = 0;
-            for (var i = 0; i < trayAfterAdd.Count; i++)
-            {
-                if (trayAfterAdd[i] != selectedType)
-                {
-                    continue;
-                }
-
-                if (foundCount < matchedSlotIndices.Length)
-                {
-                    matchedSlotIndices[foundCount] = i;
-                }
-
-                foundCount++;
-                if (foundCount == 3)
-                {
-                    break;
-                }
-            }
-
-            if (foundCount < 3)
+            if (slotIndices == null || slotIndices.Length != 3)
             {
                 return;
             }
@@ -684,10 +796,102 @@ namespace Tiles.Gameplay
             _activeTrayMatchVfx.Add(new TrayMatchVfx
             {
                 tileType = selectedType,
-                slotIndices = matchedSlotIndices,
+                slotIndices = new[] { slotIndices[0], slotIndices[1], slotIndices[2] },
                 startTime = Time.unscaledTime,
                 seed = _trayMatchVfxSeed++
             });
+        }
+
+        private void SyncProjectedTrayWithGame()
+        {
+            _projectedTray.Clear();
+            for (var i = 0; i < _game.Tray.Count; i++)
+            {
+                _projectedTray.Add(_game.Tray[i]);
+            }
+        }
+
+        private void RebuildProjectedTrayFromGameAndActiveFlights()
+        {
+            SyncProjectedTrayWithGame();
+            if (_activeTileFlights.Count == 0)
+            {
+                return;
+            }
+
+            var orderedFlights = new List<TileFlightAnimation>(_activeTileFlights);
+            orderedFlights.Sort((left, right) => left.sequence.CompareTo(right.sequence));
+            for (var i = 0; i < orderedFlights.Count; i++)
+            {
+                var simulation = SimulateTrayInsert(_projectedTray, orderedFlights[i].tileType);
+                if (simulation == null)
+                {
+                    continue;
+                }
+
+                _projectedTray.Clear();
+                _projectedTray.AddRange(simulation.trayAfterResolve);
+            }
+        }
+
+        private void UpdateTrayShiftVfx()
+        {
+            if (_activeTrayShiftVfx.Count == 0)
+            {
+                return;
+            }
+
+            var now = Time.unscaledTime;
+            for (var i = _activeTrayShiftVfx.Count - 1; i >= 0; i--)
+            {
+                var elapsed = now - _activeTrayShiftVfx[i].startTime;
+                if (elapsed >= TrayShiftDurationSeconds)
+                {
+                    _activeTrayShiftVfx.RemoveAt(i);
+                }
+            }
+        }
+
+        private void DrawTrayShiftVfx(Rect trayRect)
+        {
+            if (_activeTrayShiftVfx.Count == 0)
+            {
+                return;
+            }
+
+            var capacity = GetTrayCapacity();
+            var gap = Scale(Gap);
+            float slotsTop;
+            float slotSize;
+            float slotsStartX;
+            CalculateTrayLayoutMetrics(trayRect, capacity, gap, out slotsTop, out slotSize, out slotsStartX);
+
+            var now = Time.unscaledTime;
+            for (var i = 0; i < _activeTrayShiftVfx.Count; i++)
+            {
+                var shift = _activeTrayShiftVfx[i];
+                if (shift.fromIndex < 0 || shift.fromIndex >= capacity || shift.toIndex < 0 || shift.toIndex >= capacity)
+                {
+                    continue;
+                }
+
+                var elapsed = now - shift.startTime;
+                if (elapsed < 0f)
+                {
+                    continue;
+                }
+
+                var progress = TrayShiftDurationSeconds <= 0f
+                    ? 1f
+                    : Mathf.Clamp01(elapsed / TrayShiftDurationSeconds);
+                var eased = 1f - Mathf.Pow(1f - progress, 3f);
+                var alpha = Mathf.Lerp(0.95f, 0f, progress);
+
+                var fromRect = BuildTraySlotRect(slotsStartX, slotsTop, slotSize, gap, shift.fromIndex);
+                var toRect = BuildTraySlotRect(slotsStartX, slotsTop, slotSize, gap, shift.toIndex);
+                var rect = LerpRect(fromRect, toRect, eased);
+                DrawTrayTileVisual(rect, shift.tileType, alpha);
+            }
         }
 
         private void UpdateTrayMatchVfx()
@@ -928,6 +1132,15 @@ namespace Tiles.Gameplay
                 height);
         }
 
+        private static Rect LerpRect(Rect fromRect, Rect toRect, float t)
+        {
+            return new Rect(
+                Mathf.Lerp(fromRect.x, toRect.x, t),
+                Mathf.Lerp(fromRect.y, toRect.y, t),
+                Mathf.Lerp(fromRect.width, toRect.width, t),
+                Mathf.Lerp(fromRect.height, toRect.height, t));
+        }
+
         private void DrawOverlay(Rect topRect, Rect controlsRect)
         {
             if (_game.Status == GameStatus.Playing)
@@ -993,12 +1206,15 @@ namespace Tiles.Gameplay
             _activeTileFlights.Clear();
             _completedTileFlights.Clear();
             _pendingTileIds.Clear();
+            _projectedTray.Clear();
+            _activeTrayShiftVfx.Clear();
             _activeTrayMatchVfx.Clear();
             _flightSequence = 0;
             _trayMatchVfxSeed = 0;
 
             var definition = LoadLevelDefinition(_currentLevelIndex + 1);
             _game.StartLevel(definition, seed: _currentLevelIndex + 1);
+            SyncProjectedTrayWithGame();
         }
 
         private LevelDefinition LoadLevelDefinition(int levelNumber)
