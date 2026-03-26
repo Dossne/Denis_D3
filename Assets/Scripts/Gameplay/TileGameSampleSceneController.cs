@@ -14,7 +14,10 @@ namespace Tiles.Gameplay
         private const string HintButtonIconResourcePath = "UI/ControlButtons/Hint";
         private const string RestartButtonIconResourcePath = "UI/ControlButtons/Mix";
         private const string LevelBackgroundResourcePath = "UI/Backgrounds/level_background";
+        private const string StartScreenBackgroundResourcePath = "UI/StartScreen/Meta_screen";
+        private const string StartScreenActionTextResourcePath = "UI/StartScreen/Actiontext_Start";
         private const string BgmResourcePath = "Music/tiles_main_theme";
+        private const string StartScreenMusicResourcePath = "Music/start";
         private const string TileTouchSfxResourcePath = "Sfx/tile_touch";
         private const string Match3SfxResourcePath = "Sfx/match3";
         private const string LevelsResourcePath = "Levels/";
@@ -35,6 +38,8 @@ namespace Tiles.Gameplay
         private const float MixVfxDurationSeconds = 0.26f;
         private const float MixFlashPhaseRatio = 0.44f;
         private const float MixSymbolPulseScale = 0.08f;
+        private const float StartScreenBlinkPeriodSeconds = 0.5f;
+        private const float StartScreenMusicVolume = 0.5f;
         private const float BgmVolume = 0.45f;
         private const float TileTouchSfxVolume = 0.75f;
         private const float Match3SfxVolume = 0.9f;
@@ -95,13 +100,17 @@ namespace Tiles.Gameplay
         private float _styleScale = -1f;
         private Texture2D _tileTexture;
         private Texture2D _levelBackgroundTexture;
+        private Texture2D _startScreenBackgroundTexture;
+        private Texture2D _startScreenActionTextTexture;
         private Texture2D _undoButtonTexture;
         private Texture2D _hintButtonTexture;
         private Texture2D _restartButtonTexture;
         private AudioClip _bgmClip;
+        private AudioClip _startScreenClip;
         private AudioClip _tileTouchClip;
         private AudioClip _match3Clip;
         private AudioSource _bgmSource;
+        private AudioSource _startScreenAudioSource;
         private AudioSource _sfxSource;
         private readonly Dictionary<TileType, Texture2D> _tileSymbols = new Dictionary<TileType, Texture2D>();
         private readonly List<TileFlightAnimation> _activeTileFlights = new List<TileFlightAnimation>();
@@ -116,6 +125,7 @@ namespace Tiles.Gameplay
         private readonly Dictionary<int, TileType> _mixOldTileTypesById = new Dictionary<int, TileType>();
         private bool _hasPendingCompactTargetTray;
         private bool _isMixVfxActive;
+        private bool _isStartScreenActive = true;
         private float _mixVfxStartedAt;
         private int _flightSequence;
         private int _trayMatchVfxSeed;
@@ -180,10 +190,13 @@ namespace Tiles.Gameplay
         {
             _tileTexture = Resources.Load<Texture2D>(TileTextureResourcePath);
             _levelBackgroundTexture = Resources.Load<Texture2D>(LevelBackgroundResourcePath);
+            _startScreenBackgroundTexture = Resources.Load<Texture2D>(StartScreenBackgroundResourcePath);
+            _startScreenActionTextTexture = Resources.Load<Texture2D>(StartScreenActionTextResourcePath);
             _undoButtonTexture = Resources.Load<Texture2D>(UndoButtonIconResourcePath);
             _hintButtonTexture = Resources.Load<Texture2D>(HintButtonIconResourcePath);
             _restartButtonTexture = Resources.Load<Texture2D>(RestartButtonIconResourcePath);
             _bgmClip = Resources.Load<AudioClip>(BgmResourcePath);
+            _startScreenClip = Resources.Load<AudioClip>(StartScreenMusicResourcePath);
             _tileTouchClip = Resources.Load<AudioClip>(TileTouchSfxResourcePath);
             _match3Clip = Resources.Load<AudioClip>(Match3SfxResourcePath);
             _bgmSource = GetComponent<AudioSource>();
@@ -206,6 +219,19 @@ namespace Tiles.Gameplay
                 _bgmSource.clip = _bgmClip;
             }
 
+            if (_startScreenBackgroundTexture == null)
+            {
+                Debug.LogError("Start screen background not found at Resources/" + StartScreenBackgroundResourcePath + ".png");
+            }
+            if (_startScreenActionTextTexture == null)
+            {
+                Debug.LogError("Start screen action text not found at Resources/" + StartScreenActionTextResourcePath + ".png");
+            }
+            if (_startScreenClip == null)
+            {
+                Debug.LogError("Start screen music clip not found at Resources/" + StartScreenMusicResourcePath + ".mp3");
+            }
+
             if (_tileTouchClip == null)
             {
                 Debug.LogError("Tile touch SFX clip not found at Resources/" + TileTouchSfxResourcePath + ".mp3");
@@ -221,8 +247,18 @@ namespace Tiles.Gameplay
             _sfxSource.spatialBlend = 0f;
             _sfxSource.volume = TileTouchSfxVolume;
 
+            _startScreenAudioSource = gameObject.AddComponent<AudioSource>();
+            _startScreenAudioSource.playOnAwake = false;
+            _startScreenAudioSource.loop = true;
+            _startScreenAudioSource.spatialBlend = 0f;
+            _startScreenAudioSource.volume = StartScreenMusicVolume;
+            if (_startScreenClip != null)
+            {
+                _startScreenAudioSource.clip = _startScreenClip;
+            }
+
             LoadTileSymbols();
-            StartCurrentLevel();
+            StartStartScreenAudio();
         }
 
         private void Update()
@@ -244,6 +280,12 @@ namespace Tiles.Gameplay
             var scaleByHeight = (float)Screen.height / referenceHeight;
             _uiScale = Mathf.Clamp(Mathf.Min(scaleByWidth, scaleByHeight), 0.8f, 1.15f);
             EnsureStyles();
+
+            if (_isStartScreenActive)
+            {
+                DrawStartScreen();
+                return;
+            }
 
             if (_levelBackgroundTexture != null)
             {
@@ -338,10 +380,103 @@ namespace Tiles.Gameplay
             GUI.Label(rect, levelText, _topLevelStyle);
         }
 
+        private void DrawStartScreen()
+        {
+            var screenRect = new Rect(0f, 0f, Screen.width, Screen.height);
+            if (_startScreenBackgroundTexture != null)
+            {
+                GUI.DrawTexture(screenRect, _startScreenBackgroundTexture, ScaleMode.ScaleAndCrop, true);
+            }
+            else
+            {
+                var previousColor = GUI.color;
+                GUI.color = Color.black;
+                GUI.DrawTexture(screenRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                GUI.color = previousColor;
+            }
+
+            if (_startScreenActionTextTexture != null)
+            {
+                var pulse = 0.5f + 0.5f * Mathf.Sin((Time.unscaledTime / StartScreenBlinkPeriodSeconds) * Mathf.PI * 2f);
+                var alpha = Mathf.Lerp(0.15f, 1f, pulse);
+                var maxWidth = Screen.width * 0.75f;
+                var maxHeight = Screen.height * 0.2f;
+                var scaleByWidth = _startScreenActionTextTexture.width > 0 ? maxWidth / _startScreenActionTextTexture.width : 1f;
+                var scaleByHeight = _startScreenActionTextTexture.height > 0 ? maxHeight / _startScreenActionTextTexture.height : 1f;
+                var scale = Mathf.Min(scaleByWidth, scaleByHeight);
+                var drawWidth = _startScreenActionTextTexture.width * scale;
+                var drawHeight = _startScreenActionTextTexture.height * scale;
+                var actionRect = new Rect(
+                    (Screen.width - drawWidth) * 0.5f,
+                    (Screen.height - drawHeight) * 0.5f,
+                    drawWidth,
+                    drawHeight);
+
+                var previousColor = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, alpha);
+                GUI.DrawTexture(actionRect, _startScreenActionTextTexture, ScaleMode.ScaleToFit, true);
+                GUI.color = previousColor;
+            }
+
+            if (GUI.Button(screenRect, GUIContent.none, GUIStyle.none))
+            {
+                StartGameplayFromStartScreen();
+            }
+        }
+
+        private void StartStartScreenAudio()
+        {
+            if (!_isStartScreenActive || _startScreenAudioSource == null || _startScreenClip == null)
+            {
+                return;
+            }
+
+            if (_startScreenAudioSource.clip != _startScreenClip)
+            {
+                _startScreenAudioSource.clip = _startScreenClip;
+            }
+
+            if (!_startScreenAudioSource.isPlaying)
+            {
+                _startScreenAudioSource.Play();
+            }
+        }
+
+        private void StopStartScreenAudio()
+        {
+            if (_startScreenAudioSource != null && _startScreenAudioSource.isPlaying)
+            {
+                _startScreenAudioSource.Stop();
+            }
+        }
+
+        private void StartGameplayFromStartScreen()
+        {
+            if (!_isStartScreenActive)
+            {
+                return;
+            }
+
+            _isStartScreenActive = false;
+            StopStartScreenAudio();
+            _currentLevelIndex = 0;
+            StartCurrentLevel();
+        }
+
         private void SyncBackgroundMusic()
         {
             if (_bgmSource == null || _bgmClip == null)
             {
+                return;
+            }
+
+            if (_isStartScreenActive)
+            {
+                if (_bgmSource.isPlaying)
+                {
+                    _bgmSource.Stop();
+                }
+
                 return;
             }
 
@@ -1741,6 +1876,8 @@ namespace Tiles.Gameplay
 
         private void StartCurrentLevel()
         {
+            _isStartScreenActive = false;
+            StopStartScreenAudio();
             _hintTileId = null;
             _hintExpiresAt = 0f;
             _activeTileFlights.Clear();
