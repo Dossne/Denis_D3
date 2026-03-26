@@ -30,6 +30,9 @@ namespace Tiles.Gameplay
         private const int TrayMatchSparksPerTile = 10;
         private const float TrayShiftDurationSeconds = 0.14f;
         private const float TrayCompactDurationSeconds = 0.14f;
+        private const float MixVfxDurationSeconds = 0.26f;
+        private const float MixFlashPhaseRatio = 0.44f;
+        private const float MixSymbolPulseScale = 0.08f;
         private const float BgmVolume = 0.45f;
         private const int DefaultTrayCapacity = 7;
         private const int MaxSymbolsOnLevel = 26;
@@ -103,7 +106,10 @@ namespace Tiles.Gameplay
         private readonly List<TrayMatchVfx> _activeTrayMatchVfx = new List<TrayMatchVfx>();
         private readonly List<TrayCompactVfx> _activeTrayCompactVfx = new List<TrayCompactVfx>();
         private readonly List<TileType> _pendingCompactTargetTray = new List<TileType>();
+        private readonly Dictionary<int, TileType> _mixOldTileTypesById = new Dictionary<int, TileType>();
         private bool _hasPendingCompactTargetTray;
+        private bool _isMixVfxActive;
+        private float _mixVfxStartedAt;
         private int _flightSequence;
         private int _trayMatchVfxSeed;
 
@@ -197,6 +203,7 @@ namespace Tiles.Gameplay
 
         private void Update()
         {
+            UpdateMixVfx();
             UpdateTileFlights();
             UpdateTrayShiftVfx();
             UpdateTrayMatchVfx();
@@ -337,6 +344,8 @@ namespace Tiles.Gameplay
             var gap = Scale(Gap);
             var now = Time.unscaledTime;
             var canSelectTiles = _game.Status == GameStatus.Playing && !HasTrayInteractionLock();
+            var hasActiveMixVfx = HasActiveMixVfx();
+            var mixProgress = hasActiveMixVfx ? GetMixVfxProgress(now) : 1f;
 
             var hasTilesLeft = false;
             for (var i = 0; i < _game.Tiles.Count; i++)
@@ -440,11 +449,31 @@ namespace Tiles.Gameplay
 
                     if (symbolTexture != null)
                     {
-                        DrawCenteredTileSymbol(tileRect, symbolTexture);
+                        if (hasActiveMixVfx)
+                        {
+                            TileType oldTileType;
+                            if (TryGetMixOldTileType(tile.Id, out oldTileType))
+                            {
+                                DrawMixTileSymbolTransition(tileRect, oldTileType, tile.Type, mixProgress);
+                            }
+                            else
+                            {
+                                DrawCenteredTileSymbol(tileRect, symbolTexture);
+                            }
+                        }
+                        else
+                        {
+                            DrawCenteredTileSymbol(tileRect, symbolTexture);
+                        }
                     }
 
                     GUI.color = previousColor;
                 }
+            }
+
+            if (hasActiveMixVfx)
+            {
+                DrawMixBoardFlash(rect, mixProgress);
             }
         }
 
@@ -497,10 +526,10 @@ namespace Tiles.Gameplay
                 }
             }
 
-            GUI.enabled = !hasBlockingAnimation;
-            if (DrawControlButton(restartRect, _restartButtonTexture, "Restart"))
+            GUI.enabled = canUseBoosters;
+            if (DrawControlButton(restartRect, _restartButtonTexture, "Mix"))
             {
-                StartCurrentLevel();
+                TryMixBoardSymbols();
             }
 
             GUI.enabled = oldEnabled;
@@ -522,6 +551,33 @@ namespace Tiles.Gameplay
             GUI.color = previousColor;
 
             return clicked;
+        }
+
+        private void TryMixBoardSymbols()
+        {
+            _mixOldTileTypesById.Clear();
+            for (var i = 0; i < _game.Tiles.Count; i++)
+            {
+                var tile = _game.Tiles[i];
+                if (tile.IsRemoved)
+                {
+                    continue;
+                }
+
+                _mixOldTileTypesById[tile.Id] = tile.Type;
+            }
+
+            if (!_game.TryMixBoardSymbols())
+            {
+                _mixOldTileTypesById.Clear();
+                _isMixVfxActive = false;
+                return;
+            }
+
+            _hintTileId = null;
+            _hintExpiresAt = 0f;
+            _isMixVfxActive = true;
+            _mixVfxStartedAt = Time.unscaledTime;
         }
 
         private void DrawTray(Rect rect)
@@ -640,12 +696,34 @@ namespace Tiles.Gameplay
             return _activeTileFlights.Count > 0;
         }
 
+        private bool HasActiveMixVfx()
+        {
+            return _isMixVfxActive;
+        }
+
+        private void UpdateMixVfx()
+        {
+            if (!_isMixVfxActive)
+            {
+                return;
+            }
+
+            if (Time.unscaledTime - _mixVfxStartedAt < MixVfxDurationSeconds)
+            {
+                return;
+            }
+
+            _isMixVfxActive = false;
+            _mixOldTileTypesById.Clear();
+        }
+
         private bool HasTrayInteractionLock()
         {
             return HasActiveTileFlights() ||
                    HasActiveTrayShiftVfx() ||
                    HasActiveTrayMatchVfx() ||
                    HasActiveTrayCompactVfx() ||
+                   HasActiveMixVfx() ||
                    _pendingTileIds.Count > 0 ||
                    _hasPendingCompactTargetTray;
         }
@@ -1627,6 +1705,9 @@ namespace Tiles.Gameplay
             _activeTrayCompactVfx.Clear();
             _pendingCompactTargetTray.Clear();
             _hasPendingCompactTargetTray = false;
+            _mixOldTileTypesById.Clear();
+            _isMixVfxActive = false;
+            _mixVfxStartedAt = 0f;
             _flightSequence = 0;
             _trayMatchVfxSeed = 0;
 
@@ -1766,14 +1847,81 @@ namespace Tiles.Gameplay
             return _tileSymbols.TryGetValue(tileType, out texture) ? texture : null;
         }
 
-        private void DrawCenteredTileSymbol(Rect hostRect, Texture2D symbolTexture)
+        private bool TryGetMixOldTileType(int tileId, out TileType oldTileType)
+        {
+            return _mixOldTileTypesById.TryGetValue(tileId, out oldTileType);
+        }
+
+        private float GetMixVfxProgress(float now)
+        {
+            if (!_isMixVfxActive)
+            {
+                return 1f;
+            }
+
+            return Mathf.Clamp01((now - _mixVfxStartedAt) / MixVfxDurationSeconds);
+        }
+
+        private void DrawMixTileSymbolTransition(Rect tileRect, TileType oldTileType, TileType newTileType, float mixProgress)
+        {
+            var oldSymbolTexture = GetTileSymbolTexture(oldTileType);
+            var newSymbolTexture = GetTileSymbolTexture(newTileType);
+            if (oldSymbolTexture == null && newSymbolTexture == null)
+            {
+                return;
+            }
+
+            var progress = Mathf.Clamp01(mixProgress);
+            var pulse = 1f + Mathf.Sin(progress * Mathf.PI) * MixSymbolPulseScale;
+            var oldAlpha = 1f - progress;
+            var newAlpha = progress;
+
+            if (oldSymbolTexture != null && oldAlpha > 0.001f)
+            {
+                DrawCenteredTileSymbol(tileRect, oldSymbolTexture, oldAlpha, pulse * 1.04f);
+            }
+
+            if (newSymbolTexture != null && newAlpha > 0.001f)
+            {
+                DrawCenteredTileSymbol(tileRect, newSymbolTexture, newAlpha, pulse);
+            }
+        }
+
+        private void DrawMixBoardFlash(Rect boardRect, float mixProgress)
+        {
+            var flashRatio = Mathf.Clamp01(MixFlashPhaseRatio);
+            if (flashRatio <= 0f)
+            {
+                return;
+            }
+
+            var flashProgress = Mathf.Clamp01(mixProgress / flashRatio);
+            var intensity = 1f - flashProgress;
+            if (intensity <= 0.001f)
+            {
+                return;
+            }
+
+            var pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 26f);
+            var previousColor = GUI.color;
+
+            GUI.color = new Color(0.36f, 0.86f, 1f, Mathf.Lerp(0.11f, 0.2f, pulse) * intensity);
+            GUI.DrawTexture(boardRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+
+            GUI.color = new Color(1f, 1f, 1f, Mathf.Lerp(0.06f, 0.15f, pulse) * intensity);
+            GUI.DrawTexture(boardRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+
+            GUI.color = previousColor;
+        }
+
+        private void DrawCenteredTileSymbol(Rect hostRect, Texture2D symbolTexture, float alpha = 1f, float scale = 1f)
         {
             if (symbolTexture == null)
             {
                 return;
             }
 
-            var iconSize = Mathf.Min(hostRect.width, hostRect.height) * TileIconSizeFactor;
+            var iconSize = Mathf.Min(hostRect.width, hostRect.height) * TileIconSizeFactor * Mathf.Max(0.01f, scale);
             if (iconSize <= 0f)
             {
                 return;
@@ -1784,7 +1932,12 @@ namespace Tiles.Gameplay
                 hostRect.y + ((hostRect.height - iconSize) * 0.5f),
                 iconSize,
                 iconSize);
+
+            var previousColor = GUI.color;
+            var clampedAlpha = Mathf.Clamp01(alpha);
+            GUI.color = new Color(previousColor.r, previousColor.g, previousColor.b, previousColor.a * clampedAlpha);
             GUI.DrawTexture(iconRect, symbolTexture, ScaleMode.ScaleToFit, true);
+            GUI.color = previousColor;
         }
 
         private static string GetTileShortCode(TileType tileType)
