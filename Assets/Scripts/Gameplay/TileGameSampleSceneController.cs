@@ -10,6 +10,9 @@ namespace Tiles.Gameplay
         private const string TargetSceneName = "SampleScene";
         private const string TileTextureResourcePath = "Tiles/tile_base";
         private const string TileSymbolsResourcePath = "TileSymbols";
+        private const string UndoButtonIconResourcePath = "UI/ControlButtons/Undo";
+        private const string HintButtonIconResourcePath = "UI/ControlButtons/Hint";
+        private const string RestartButtonIconResourcePath = "UI/ControlButtons/Mix";
         private const string BgmResourcePath = "Music/tiles_main_theme";
         private const string LevelsResourcePath = "Levels/";
         private const float TileIconSizeFactor = 0.58f;
@@ -82,6 +85,9 @@ namespace Tiles.Gameplay
         private float _uiScale = 1f;
         private float _styleScale = -1f;
         private Texture2D _tileTexture;
+        private Texture2D _undoButtonTexture;
+        private Texture2D _hintButtonTexture;
+        private Texture2D _restartButtonTexture;
         private AudioClip _bgmClip;
         private AudioSource _bgmSource;
         private readonly Dictionary<TileType, Texture2D> _tileSymbols = new Dictionary<TileType, Texture2D>();
@@ -157,6 +163,9 @@ namespace Tiles.Gameplay
         private void Start()
         {
             _tileTexture = Resources.Load<Texture2D>(TileTextureResourcePath);
+            _undoButtonTexture = Resources.Load<Texture2D>(UndoButtonIconResourcePath);
+            _hintButtonTexture = Resources.Load<Texture2D>(HintButtonIconResourcePath);
+            _restartButtonTexture = Resources.Load<Texture2D>(RestartButtonIconResourcePath);
             _bgmClip = Resources.Load<AudioClip>(BgmResourcePath);
             _bgmSource = GetComponent<AudioSource>();
             if (_bgmSource == null)
@@ -454,7 +463,7 @@ namespace Tiles.Gameplay
             var canUseBoosters = _game.Status == GameStatus.Playing && !hasBlockingAnimation;
 
             GUI.enabled = _game.CanUndo && canUseBoosters;
-            if (GUI.Button(undoRect, "Undo", _buttonStyle))
+            if (DrawControlButton(undoRect, _undoButtonTexture, "Undo"))
             {
                 _game.Undo();
                 _hintTileId = null;
@@ -465,7 +474,7 @@ namespace Tiles.Gameplay
             }
 
             GUI.enabled = canUseBoosters;
-            if (GUI.Button(hintRect, "Hint", _buttonStyle))
+            if (DrawControlButton(hintRect, _hintButtonTexture, "Hint"))
             {
                 var hint = _game.GetHintTileId();
                 if (hint.HasValue)
@@ -476,12 +485,36 @@ namespace Tiles.Gameplay
             }
 
             GUI.enabled = !hasBlockingAnimation;
-            if (GUI.Button(restartRect, "Restart", _buttonStyle))
+            if (DrawControlButton(restartRect, _restartButtonTexture, "Restart"))
             {
                 StartCurrentLevel();
             }
 
             GUI.enabled = oldEnabled;
+        }
+
+        private bool DrawControlButton(Rect buttonRect, Texture2D iconTexture, string fallbackLabel)
+        {
+            var clicked = GUI.Button(buttonRect, iconTexture == null ? fallbackLabel : string.Empty, _buttonStyle);
+            if (iconTexture == null)
+            {
+                return clicked;
+            }
+
+            var iconInset = Mathf.Min(Scale(12f), Mathf.Min(buttonRect.width, buttonRect.height) * 0.22f);
+            var iconRect = new Rect(
+                buttonRect.x + iconInset,
+                buttonRect.y + iconInset,
+                Mathf.Max(1f, buttonRect.width - (iconInset * 2f)),
+                Mathf.Max(1f, buttonRect.height - (iconInset * 2f)));
+
+            var previousColor = GUI.color;
+            var iconAlpha = GUI.enabled ? 1f : 0.45f;
+            GUI.color = new Color(1f, 1f, 1f, iconAlpha);
+            GUI.DrawTexture(iconRect, iconTexture, ScaleMode.ScaleToFit, true);
+            GUI.color = previousColor;
+
+            return clicked;
         }
 
         private void DrawTray(Rect rect)
