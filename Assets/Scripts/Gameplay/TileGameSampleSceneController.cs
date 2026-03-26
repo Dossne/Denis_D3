@@ -542,8 +542,8 @@ namespace Tiles.Gameplay
 
             var scientistMarginX = Screen.width * 0.02f;
             var scientistMarginBottom = Screen.height * 0.02f;
-            var scientistMaxWidth = Screen.width * (_isPortrait ? 0.45f : 0.28f);
-            var scientistMaxHeight = Screen.height * (_isPortrait ? 0.46f : 0.74f);
+            var scientistMaxWidth = Screen.width * (_isPortrait ? 0.9f : 0.56f);
+            var scientistMaxHeight = Screen.height * (_isPortrait ? 0.92f : 1.48f);
             var scientistRect = BuildBottomLeftFittedRect(
                 scientistTextureForLayout,
                 scientistMarginX,
@@ -590,11 +590,17 @@ namespace Tiles.Gameplay
                 scientistRect.x + scientistRect.width * 0.24f,
                 dialogueMargin,
                 Screen.width - dialogueWidth - dialogueMargin);
-            var dialogueY = scientistRect.y - dialogueHeight - (Screen.height * 0.015f);
-            dialogueY = Mathf.Clamp(
-                dialogueY,
-                Screen.height * 0.02f,
-                Screen.height - dialogueHeight - (Screen.height * 0.02f));
+            var dialogueY = scientistRect.y - dialogueHeight - (Screen.height * 0.13f);
+            var dialogueMinY = Screen.height * 0.02f;
+            var dialogueMaxY = Mathf.Min(
+                Screen.height - dialogueHeight - (Screen.height * 0.02f),
+                scientistRect.y - dialogueHeight - (Screen.height * 0.04f));
+            if (dialogueMaxY < dialogueMinY)
+            {
+                dialogueMaxY = dialogueMinY;
+            }
+
+            dialogueY = Mathf.Clamp(dialogueY, dialogueMinY, dialogueMaxY);
             var dialogueRect = new Rect(dialogueX, dialogueY, dialogueWidth, dialogueHeight);
 
             if (_startScreenDialogueWindowTexture != null)
@@ -606,9 +612,9 @@ namespace Tiles.Gameplay
             {
                 var textRect = new Rect(
                     dialogueRect.x + dialogueRect.width * 0.11f,
-                    dialogueRect.y + dialogueRect.height * 0.16f,
+                    dialogueRect.y + dialogueRect.height * 0.11f,
                     dialogueRect.width * 0.78f,
-                    dialogueRect.height * 0.66f);
+                    dialogueRect.height * 0.74f);
 
                 var previousColor = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, dialogueAlpha);
@@ -946,7 +952,6 @@ namespace Tiles.Gameplay
 
             if (!hasTilesLeft)
             {
-                GUI.Label(new Rect(rect.x + 12f, rect.y + 12f, rect.width - 24f, 24f), "Board cleared", _statusStyle);
                 return;
             }
 
@@ -2669,7 +2674,7 @@ namespace Tiles.Gameplay
             _startScreenDialogueStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = ScaleFont(34, landscapeTextFactor),
+                fontSize = ScaleFont(68, landscapeTextFactor),
                 fontStyle = FontStyle.Bold,
                 wordWrap = true
             };
