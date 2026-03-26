@@ -284,23 +284,8 @@ namespace Tiles.Gameplay
         {
             GUI.Box(rect, string.Empty);
 
-            var levelText = "Level " + (_currentLevelIndex + 1);
-            var statusText = "Status: " + _game.Status;
-            var tilesLeft = CountTilesLeft();
-            var infoText = "Tiles left: " + tilesLeft;
-
-            GUI.Label(
-                new Rect(rect.x + Scale(12f), rect.y + Scale(10f), rect.width * 0.44f, Scale(34f)),
-                levelText,
-                _titleStyle);
-            GUI.Label(
-                new Rect(rect.x + Scale(12f), rect.y + Scale(44f), rect.width * 0.44f, Scale(28f)),
-                infoText,
-                _statusStyle);
-            GUI.Label(
-                new Rect(rect.x + rect.width * 0.5f, rect.y + Scale(24f), rect.width * 0.46f, Scale(30f)),
-                statusText,
-                _statusStyle);
+            var levelText = (_currentLevelIndex + 1).ToString();
+            GUI.Label(rect, levelText, _titleStyle);
         }
 
         private void SyncBackgroundMusic()
