@@ -20,10 +20,14 @@ namespace Tiles.Gameplay
         private const string StartScreenScientistHappyResourcePath = "UI/StartScreen/Scientist_happy";
         private const string StartScreenScientistSupportResourcePath = "UI/StartScreen/Scientist_support";
         private const string StartScreenDialogueWindowResourcePath = "UI/StartScreen/dialogue_window";
+        private const string WinWindowResourcePath = "UI/ResultScreens/Win_window";
+        private const string LoseWindowResourcePath = "UI/ResultScreens/Lose_window";
         private const string BgmResourcePath = "Music/tiles_main_theme";
         private const string StartScreenMusicResourcePath = "Music/start";
         private const string TileTouchSfxResourcePath = "Sfx/tile_touch";
         private const string Match3SfxResourcePath = "Sfx/match3";
+        private const string WinSfxResourcePath = "Sfx/win";
+        private const string LoseSfxResourcePath = "Sfx/lose";
         private const string LevelsResourcePath = "Levels/";
         private const float TileIconSizeFactor = 0.696f;
         private const float Padding = 20f;
@@ -50,6 +54,7 @@ namespace Tiles.Gameplay
         private const float BgmVolume = 0.45f;
         private const float TileTouchSfxVolume = 0.75f;
         private const float Match3SfxVolume = 0.9f;
+        private const float ResultSfxVolume = 0.95f;
         private const int DefaultTrayCapacity = 7;
         private const int MaxSymbolsOnLevel = 26;
         private const int MaxStackHeightPerSector = 9;
@@ -117,6 +122,8 @@ namespace Tiles.Gameplay
         private Texture2D _startScreenScientistHappyTexture;
         private Texture2D _startScreenScientistSupportTexture;
         private Texture2D _startScreenDialogueWindowTexture;
+        private Texture2D _winWindowTexture;
+        private Texture2D _loseWindowTexture;
         private Texture2D _undoButtonTexture;
         private Texture2D _hintButtonTexture;
         private Texture2D _restartButtonTexture;
@@ -124,6 +131,8 @@ namespace Tiles.Gameplay
         private AudioClip _startScreenClip;
         private AudioClip _tileTouchClip;
         private AudioClip _match3Clip;
+        private AudioClip _winClip;
+        private AudioClip _loseClip;
         private AudioSource _bgmSource;
         private AudioSource _startScreenAudioSource;
         private AudioSource _sfxSource;
@@ -148,6 +157,7 @@ namespace Tiles.Gameplay
         private float _startScreenTapUnlockAt;
         private int _flightSequence;
         private int _trayMatchVfxSeed;
+        private GameStatus _lastResultStatus = GameStatus.Playing;
         private string _startScreenDialogueText = string.Empty;
         private string _pendingStartScreenDialogueText = string.Empty;
         private StartScreenStage _startScreenStage = StartScreenStage.Prompt;
@@ -229,6 +239,8 @@ namespace Tiles.Gameplay
             _startScreenScientistHappyTexture = Resources.Load<Texture2D>(StartScreenScientistHappyResourcePath);
             _startScreenScientistSupportTexture = Resources.Load<Texture2D>(StartScreenScientistSupportResourcePath);
             _startScreenDialogueWindowTexture = Resources.Load<Texture2D>(StartScreenDialogueWindowResourcePath);
+            _winWindowTexture = Resources.Load<Texture2D>(WinWindowResourcePath);
+            _loseWindowTexture = Resources.Load<Texture2D>(LoseWindowResourcePath);
             _undoButtonTexture = Resources.Load<Texture2D>(UndoButtonIconResourcePath);
             _hintButtonTexture = Resources.Load<Texture2D>(HintButtonIconResourcePath);
             _restartButtonTexture = Resources.Load<Texture2D>(RestartButtonIconResourcePath);
@@ -236,6 +248,8 @@ namespace Tiles.Gameplay
             _startScreenClip = Resources.Load<AudioClip>(StartScreenMusicResourcePath);
             _tileTouchClip = Resources.Load<AudioClip>(TileTouchSfxResourcePath);
             _match3Clip = Resources.Load<AudioClip>(Match3SfxResourcePath);
+            _winClip = Resources.Load<AudioClip>(WinSfxResourcePath);
+            _loseClip = Resources.Load<AudioClip>(LoseSfxResourcePath);
             _bgmSource = GetComponent<AudioSource>();
             if (_bgmSource == null)
             {
@@ -280,6 +294,14 @@ namespace Tiles.Gameplay
             {
                 Debug.LogError("Start screen dialogue window not found at Resources/" + StartScreenDialogueWindowResourcePath + ".png");
             }
+            if (_winWindowTexture == null)
+            {
+                Debug.LogError("Win window texture not found at Resources/" + WinWindowResourcePath + ".png");
+            }
+            if (_loseWindowTexture == null)
+            {
+                Debug.LogError("Lose window texture not found at Resources/" + LoseWindowResourcePath + ".png");
+            }
             if (_startScreenClip == null)
             {
                 Debug.LogError("Start screen music clip not found at Resources/" + StartScreenMusicResourcePath + ".mp3");
@@ -292,6 +314,14 @@ namespace Tiles.Gameplay
             if (_match3Clip == null)
             {
                 Debug.LogError("Match3 SFX clip not found at Resources/" + Match3SfxResourcePath + ".mp3");
+            }
+            if (_winClip == null)
+            {
+                Debug.LogError("Win SFX clip not found at Resources/" + WinSfxResourcePath + ".mp3");
+            }
+            if (_loseClip == null)
+            {
+                Debug.LogError("Lose SFX clip not found at Resources/" + LoseSfxResourcePath + ".mp3");
             }
 
             _sfxSource = gameObject.AddComponent<AudioSource>();
@@ -322,6 +352,7 @@ namespace Tiles.Gameplay
             UpdateTrayShiftVfx();
             UpdateTrayMatchVfx();
             UpdateTrayCompactVfx();
+            UpdateResultScreenSfx();
             SyncBackgroundMusic();
         }
 
@@ -803,6 +834,45 @@ namespace Tiles.Gameplay
             {
                 _startScreenAudioSource.Stop();
             }
+        }
+
+        private void UpdateResultScreenSfx()
+        {
+            if (_isStartScreenActive)
+            {
+                _lastResultStatus = GameStatus.Playing;
+                return;
+            }
+
+            var currentStatus = _game.Status;
+            if (currentStatus == _lastResultStatus)
+            {
+                return;
+            }
+
+            if (_lastResultStatus == GameStatus.Playing)
+            {
+                if (currentStatus == GameStatus.Won)
+                {
+                    PlayResultSfx(_winClip);
+                }
+                else if (currentStatus == GameStatus.Lost)
+                {
+                    PlayResultSfx(_loseClip);
+                }
+            }
+
+            _lastResultStatus = currentStatus;
+        }
+
+        private void PlayResultSfx(AudioClip clip)
+        {
+            if (_sfxSource == null || clip == null)
+            {
+                return;
+            }
+
+            _sfxSource.PlayOneShot(clip, ResultSfxVolume);
         }
 
         private void StartGameplayFromStartScreen()
@@ -2182,6 +2252,40 @@ namespace Tiles.Gameplay
             var safeBottom = Mathf.Min(trayRect.yMin, controlsRect.yMin) - Scale(8f);
             var safeHeight = Mathf.Max(Scale(140f), safeBottom - safeTop);
 
+            var resultTexture = _game.Status == GameStatus.Won ? _winWindowTexture : _loseWindowTexture;
+            if (resultTexture == null)
+            {
+                DrawOverlayFallback(safeTop, safeBottom, safeHeight);
+                return;
+            }
+
+            var maxPanelWidth = Screen.width - Scale(40f);
+            var maxPanelHeight = safeHeight - Scale(8f);
+            var scaleByWidth = resultTexture.width > 0 ? maxPanelWidth / resultTexture.width : 1f;
+            var scaleByHeight = resultTexture.height > 0 ? maxPanelHeight / resultTexture.height : 1f;
+            var textureScale = Mathf.Min(scaleByWidth, scaleByHeight);
+            var panelWidth = Mathf.Max(Scale(160f), resultTexture.width * textureScale);
+            var panelHeight = Mathf.Max(Scale(120f), resultTexture.height * textureScale);
+            var centerY = (safeTop + safeBottom) * 0.5f;
+            var panelY = centerY - (panelHeight * 0.5f);
+            panelY = Mathf.Clamp(panelY, safeTop, safeBottom - panelHeight);
+
+            var panelRect = new Rect(
+                (Screen.width - panelWidth) * 0.5f,
+                panelY,
+                panelWidth,
+                panelHeight);
+
+            GUI.DrawTexture(panelRect, resultTexture, ScaleMode.ScaleToFit, true);
+
+            if (GUI.Button(panelRect, GUIContent.none, GUIStyle.none))
+            {
+                HandleResultOverlayTap();
+            }
+        }
+
+        private void DrawOverlayFallback(float safeTop, float safeBottom, float safeHeight)
+        {
             var panelWidth = Mathf.Min(Scale(420f), Screen.width - Scale(40f));
             var panelHeight = Mathf.Min(Scale(220f), safeHeight - Scale(8f));
             panelHeight = Mathf.Max(Scale(140f), panelHeight);
@@ -2201,10 +2305,7 @@ namespace Tiles.Gameplay
             var action = _game.Status == GameStatus.Won ? "Next Level" : "Try Again";
 
             var titleRect = new Rect(panelRect.x, panelRect.y + Scale(20f), panelRect.width, Scale(44f));
-            GUI.Label(
-                titleRect,
-                title,
-                _titleStyle);
+            GUI.Label(titleRect, title, _titleStyle);
 
             var buttonHeight = Mathf.Max(48f, Mathf.Min(Scale(68f), panelRect.height - Scale(96f)));
             var buttonY = panelRect.yMax - buttonHeight - Scale(20f);
@@ -2220,13 +2321,18 @@ namespace Tiles.Gameplay
                     action,
                     _buttonStyle))
             {
-                if (_game.Status == GameStatus.Won)
-                {
-                    _currentLevelIndex++;
-                }
-
-                StartCurrentLevel();
+                HandleResultOverlayTap();
             }
+        }
+
+        private void HandleResultOverlayTap()
+        {
+            if (_game.Status == GameStatus.Won)
+            {
+                _currentLevelIndex++;
+            }
+
+            StartCurrentLevel();
         }
 
         private void StartCurrentLevel()
@@ -2249,6 +2355,7 @@ namespace Tiles.Gameplay
             _mixVfxStartedAt = 0f;
             _flightSequence = 0;
             _trayMatchVfxSeed = 0;
+            _lastResultStatus = GameStatus.Playing;
 
             var definition = LoadLevelDefinition(_currentLevelIndex + 1);
             _game.StartLevel(definition, seed: _currentLevelIndex + 1);
