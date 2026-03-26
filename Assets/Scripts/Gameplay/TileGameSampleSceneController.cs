@@ -16,6 +16,10 @@ namespace Tiles.Gameplay
         private const float Padding = 20f;
         private const float Gap = 8f;
         private const float HintDurationSeconds = 2f;
+        private const float TileBounceDurationSeconds = 0.08f;
+        private const float TileFlightDurationSeconds = 0.24f;
+        private const float TileBounceScaleFactor = 1.1f;
+        private const float TileFlightArcFactor = 0.18f;
         private const float BgmVolume = 0.45f;
         private const int DefaultTrayCapacity = 7;
         private const int MaxSymbolsOnLevel = 26;
@@ -75,6 +79,20 @@ namespace Tiles.Gameplay
         private AudioClip _bgmClip;
         private AudioSource _bgmSource;
         private readonly Dictionary<TileType, Texture2D> _tileSymbols = new Dictionary<TileType, Texture2D>();
+        private readonly List<TileFlightAnimation> _activeTileFlights = new List<TileFlightAnimation>();
+        private readonly List<TileFlightAnimation> _completedTileFlights = new List<TileFlightAnimation>();
+        private readonly HashSet<int> _pendingTileIds = new HashSet<int>();
+        private int _flightSequence;
+
+        private sealed class TileFlightAnimation
+        {
+            public int tileId;
+            public TileType tileType;
+            public Rect startRect;
+            public Rect targetRect;
+            public float startTime;
+            public int sequence;
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureControllerInSampleScene()
@@ -124,6 +142,7 @@ namespace Tiles.Gameplay
 
         private void Update()
         {
+            UpdateTileFlights();
             SyncBackgroundMusic();
         }
 
@@ -185,7 +204,8 @@ namespace Tiles.Gameplay
                 Mathf.Max(Scale(8f), boardHeight));
 
             DrawTop(topRect);
-            DrawBoard(boardRect);
+            DrawBoard(boardRect, trayRect);
+            DrawActiveTileFlights();
             DrawControls(controlsRect);
             DrawTray(trayRect);
             DrawOverlay(topRect, controlsRect);
@@ -254,7 +274,7 @@ namespace Tiles.Gameplay
             }
         }
 
-        private void DrawBoard(Rect rect)
+        private void DrawBoard(Rect rect, Rect trayRect)
         {
             GUI.Box(rect, string.Empty);
             var gap = Scale(Gap);
@@ -263,7 +283,7 @@ namespace Tiles.Gameplay
             for (var i = 0; i < _game.Tiles.Count; i++)
             {
                 var tile = _game.Tiles[i];
-                if (tile.IsRemoved)
+                if (tile.IsRemoved || _pendingTileIds.Contains(tile.Id))
                 {
                     continue;
                 }
@@ -304,7 +324,7 @@ namespace Tiles.Gameplay
                 for (var i = 0; i < _game.Tiles.Count; i++)
                 {
                     var tile = _game.Tiles[i];
-                    if (tile.IsRemoved || tile.Layer != layer)
+                    if (tile.IsRemoved || _pendingTileIds.Contains(tile.Id) || tile.Layer != layer)
                     {
                         continue;
                     }
@@ -315,7 +335,7 @@ namespace Tiles.Gameplay
                         tileSize,
                         tileSize);
 
-                    var isFree = _game.IsTileFree(tile.Id);
+                    var isFree = IsTileFreeVisual(tile.Id);
                     var isHint = _hintTileId.HasValue && _hintTileId.Value == tile.Id;
                     var previousColor = GUI.color;
                     GUI.color = GetTileColor(tile.Type, isFree, isHint);
@@ -336,8 +356,7 @@ namespace Tiles.Gameplay
                         {
                             if (GUI.Button(tileRect, label, _tileOverlayStyle))
                             {
-                                _game.TrySelectTile(tile.Id);
-                                _hintTileId = null;
+                                StartTileFlight(tile, tileRect, trayRect);
                             }
                         }
                         else
@@ -351,8 +370,7 @@ namespace Tiles.Gameplay
                         {
                             if (GUI.Button(tileRect, label, _tileStyle))
                             {
-                                _game.TrySelectTile(tile.Id);
-                                _hintTileId = null;
+                                StartTileFlight(tile, tileRect, trayRect);
                             }
                         }
                         else
@@ -385,15 +403,16 @@ namespace Tiles.Gameplay
             var restartRect = new Rect(hintRect.xMax + gap, buttonY, buttonWidth, buttonHeight);
 
             var oldEnabled = GUI.enabled;
+            var canUseBoosters = _game.Status == GameStatus.Playing && !HasActiveTileFlights();
 
-            GUI.enabled = _game.CanUndo && _game.Status == GameStatus.Playing;
+            GUI.enabled = _game.CanUndo && canUseBoosters;
             if (GUI.Button(undoRect, "Undo", _buttonStyle))
             {
                 _game.Undo();
                 _hintTileId = null;
             }
 
-            GUI.enabled = _game.Status == GameStatus.Playing;
+            GUI.enabled = canUseBoosters;
             if (GUI.Button(hintRect, "Hint", _buttonStyle))
             {
                 var hint = _game.GetHintTileId();
@@ -404,7 +423,7 @@ namespace Tiles.Gameplay
                 }
             }
 
-            GUI.enabled = true;
+            GUI.enabled = !HasActiveTileFlights();
             if (GUI.Button(restartRect, "Restart", _buttonStyle))
             {
                 StartCurrentLevel();
@@ -422,18 +441,15 @@ namespace Tiles.Gameplay
                 "Tray " + _game.Tray.Count + "/" + _game.TrayCapacity,
                 _statusStyle);
 
-            var capacity = _game.TrayCapacity > 0 ? _game.TrayCapacity : DefaultTrayCapacity;
-            var slotsTop = rect.y + Scale(42f);
-            var maxSlotSizeByHeight = Mathf.Max(Scale(24f), rect.height - Scale(48f));
-            var slotSize = Mathf.Min(maxSlotSizeByHeight, (rect.width - ((capacity - 1) * gap) - Scale(12f)) / capacity);
+            var capacity = GetTrayCapacity();
+            float slotsTop;
+            float slotSize;
+            float slotsStartX;
+            CalculateTrayLayoutMetrics(rect, capacity, gap, out slotsTop, out slotSize, out slotsStartX);
 
             for (var i = 0; i < capacity; i++)
             {
-                var slotRect = new Rect(
-                    rect.x + Scale(6f) + i * (slotSize + gap),
-                    slotsTop,
-                    slotSize,
-                    slotSize);
+                var slotRect = BuildTraySlotRect(slotsStartX, slotsTop, slotSize, gap, i);
 
                 if (i < _game.Tray.Count)
                 {
@@ -467,6 +483,239 @@ namespace Tiles.Gameplay
                     GUI.Box(slotRect, string.Empty, _trayStyle);
                 }
             }
+        }
+
+        private int GetTrayCapacity()
+        {
+            var capacity = _game.TrayCapacity > 0 ? _game.TrayCapacity : DefaultTrayCapacity;
+            return Mathf.Max(1, capacity);
+        }
+
+        private void CalculateTrayLayoutMetrics(
+            Rect rect,
+            int capacity,
+            float gap,
+            out float slotsTop,
+            out float slotSize,
+            out float slotsStartX)
+        {
+            slotsTop = rect.y + Scale(42f);
+            var maxSlotSizeByHeight = Mathf.Max(Scale(24f), rect.height - Scale(48f));
+            slotSize = Mathf.Min(maxSlotSizeByHeight, (rect.width - ((capacity - 1) * gap) - Scale(12f)) / capacity);
+            slotsStartX = rect.x + Scale(6f);
+        }
+
+        private static Rect BuildTraySlotRect(float slotsStartX, float slotsTop, float slotSize, float gap, int index)
+        {
+            return new Rect(
+                slotsStartX + index * (slotSize + gap),
+                slotsTop,
+                slotSize,
+                slotSize);
+        }
+
+        private bool HasActiveTileFlights()
+        {
+            return _activeTileFlights.Count > 0;
+        }
+
+        private void StartTileFlight(TileModel tile, Rect startRect, Rect trayRect)
+        {
+            if (tile == null || _pendingTileIds.Contains(tile.Id) || _game.Status != GameStatus.Playing)
+            {
+                return;
+            }
+
+            var targetRect = GetNextFlightTargetRect(trayRect);
+            _pendingTileIds.Add(tile.Id);
+            _activeTileFlights.Add(new TileFlightAnimation
+            {
+                tileId = tile.Id,
+                tileType = tile.Type,
+                startRect = startRect,
+                targetRect = targetRect,
+                startTime = Time.unscaledTime,
+                sequence = _flightSequence++
+            });
+
+            _hintTileId = null;
+        }
+
+        private Rect GetNextFlightTargetRect(Rect trayRect)
+        {
+            var capacity = GetTrayCapacity();
+            var gap = Scale(Gap);
+            float slotsTop;
+            float slotSize;
+            float slotsStartX;
+            CalculateTrayLayoutMetrics(trayRect, capacity, gap, out slotsTop, out slotSize, out slotsStartX);
+
+            var virtualTrayCount = _game.Tray.Count + _activeTileFlights.Count;
+            var targetIndex = Mathf.Clamp(virtualTrayCount, 0, capacity - 1);
+            return BuildTraySlotRect(slotsStartX, slotsTop, slotSize, gap, targetIndex);
+        }
+
+        private void UpdateTileFlights()
+        {
+            if (_activeTileFlights.Count == 0)
+            {
+                return;
+            }
+
+            var now = Time.unscaledTime;
+            var totalDuration = TileBounceDurationSeconds + TileFlightDurationSeconds;
+            _completedTileFlights.Clear();
+
+            for (var i = _activeTileFlights.Count - 1; i >= 0; i--)
+            {
+                var flight = _activeTileFlights[i];
+                if (now - flight.startTime < totalDuration)
+                {
+                    continue;
+                }
+
+                _activeTileFlights.RemoveAt(i);
+                _completedTileFlights.Add(flight);
+            }
+
+            if (_completedTileFlights.Count == 0)
+            {
+                return;
+            }
+
+            _completedTileFlights.Sort((left, right) => left.sequence.CompareTo(right.sequence));
+            for (var i = 0; i < _completedTileFlights.Count; i++)
+            {
+                var flight = _completedTileFlights[i];
+                _pendingTileIds.Remove(flight.tileId);
+                if (!_game.TrySelectTile(flight.tileId))
+                {
+                    Debug.LogWarning(
+                        "Tile flight completed but TrySelectTile failed for tileId=" + flight.tileId + ".");
+                }
+            }
+        }
+
+        private bool IsTileFreeVisual(int tileId)
+        {
+            if (_pendingTileIds.Contains(tileId))
+            {
+                return false;
+            }
+
+            TileModel tile = null;
+            for (var i = 0; i < _game.Tiles.Count; i++)
+            {
+                if (_game.Tiles[i].Id == tileId)
+                {
+                    tile = _game.Tiles[i];
+                    break;
+                }
+            }
+
+            if (tile == null || tile.IsRemoved)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < _game.Tiles.Count; i++)
+            {
+                var candidate = _game.Tiles[i];
+                if (candidate.Id == tileId || candidate.IsRemoved || _pendingTileIds.Contains(candidate.Id))
+                {
+                    continue;
+                }
+
+                if (candidate.Column == tile.Column && candidate.Row == tile.Row && candidate.Layer > tile.Layer)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void DrawActiveTileFlights()
+        {
+            if (_activeTileFlights.Count == 0)
+            {
+                return;
+            }
+
+            var now = Time.unscaledTime;
+            for (var i = 0; i < _activeTileFlights.Count; i++)
+            {
+                var flight = _activeTileFlights[i];
+                var flightRect = EvaluateFlightRect(flight, now);
+                DrawFlightTileVisual(flightRect, flight.tileType);
+            }
+        }
+
+        private Rect EvaluateFlightRect(TileFlightAnimation flight, float now)
+        {
+            var elapsed = Mathf.Max(0f, now - flight.startTime);
+            if (elapsed <= TileBounceDurationSeconds)
+            {
+                var bounceProgress = TileBounceDurationSeconds <= 0f
+                    ? 1f
+                    : Mathf.Clamp01(elapsed / TileBounceDurationSeconds);
+                var bounceScale = Mathf.Lerp(1f, TileBounceScaleFactor, Mathf.Sin(bounceProgress * Mathf.PI));
+                return ScaleRectAroundCenter(flight.startRect, bounceScale);
+            }
+
+            var flightProgress = TileFlightDurationSeconds <= 0f
+                ? 1f
+                : Mathf.Clamp01((elapsed - TileBounceDurationSeconds) / TileFlightDurationSeconds);
+            var eased = 1f - Mathf.Pow(1f - flightProgress, 3f);
+
+            var startCenter = new Vector2(flight.startRect.center.x, flight.startRect.center.y);
+            var targetCenter = new Vector2(flight.targetRect.center.x, flight.targetRect.center.y);
+            var center = Vector2.Lerp(startCenter, targetCenter, eased);
+            var distance = Vector2.Distance(startCenter, targetCenter);
+            var arcHeight = Mathf.Clamp(distance * TileFlightArcFactor, Scale(18f), Scale(110f));
+            center.y -= Mathf.Sin(flightProgress * Mathf.PI) * arcHeight;
+
+            var width = Mathf.Lerp(flight.startRect.width, flight.targetRect.width, eased);
+            var height = Mathf.Lerp(flight.startRect.height, flight.targetRect.height, eased);
+            return new Rect(center.x - (width * 0.5f), center.y - (height * 0.5f), width, height);
+        }
+
+        private void DrawFlightTileVisual(Rect tileRect, TileType tileType)
+        {
+            var symbolTexture = GetTileSymbolTexture(tileType);
+            var label = symbolTexture == null ? GetTileShortCode(tileType) : string.Empty;
+
+            if (_tileTexture != null)
+            {
+                DrawCroppedTileBase(tileRect, Color.white);
+                if (!string.IsNullOrEmpty(label))
+                {
+                    GUI.Label(tileRect, label, _tileOverlayStyle);
+                }
+            }
+            else
+            {
+                var previousColor = GUI.color;
+                GUI.color = GetTileColor(tileType, true, false);
+                GUI.Box(tileRect, label, _tileStyle);
+                GUI.color = previousColor;
+            }
+
+            if (symbolTexture != null)
+            {
+                DrawCenteredTileSymbol(tileRect, symbolTexture);
+            }
+        }
+
+        private static Rect ScaleRectAroundCenter(Rect rect, float scale)
+        {
+            var width = rect.width * scale;
+            var height = rect.height * scale;
+            return new Rect(
+                rect.center.x - (width * 0.5f),
+                rect.center.y - (height * 0.5f),
+                width,
+                height);
         }
 
         private void DrawOverlay(Rect topRect, Rect controlsRect)
@@ -531,6 +780,10 @@ namespace Tiles.Gameplay
         {
             _hintTileId = null;
             _hintExpiresAt = 0f;
+            _activeTileFlights.Clear();
+            _completedTileFlights.Clear();
+            _pendingTileIds.Clear();
+            _flightSequence = 0;
 
             var definition = LoadLevelDefinition(_currentLevelIndex + 1);
             _game.StartLevel(definition, seed: _currentLevelIndex + 1);
