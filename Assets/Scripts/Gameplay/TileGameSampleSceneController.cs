@@ -16,6 +16,7 @@ namespace Tiles.Gameplay
         private const string LevelBackgroundResourcePath = "UI/Backgrounds/level_background";
         private const string BgmResourcePath = "Music/tiles_main_theme";
         private const string TileTouchSfxResourcePath = "Sfx/tile_touch";
+        private const string Match3SfxResourcePath = "Sfx/match3";
         private const string LevelsResourcePath = "Levels/";
         private const float TileIconSizeFactor = 0.696f;
         private const float Padding = 20f;
@@ -36,6 +37,7 @@ namespace Tiles.Gameplay
         private const float MixSymbolPulseScale = 0.08f;
         private const float BgmVolume = 0.45f;
         private const float TileTouchSfxVolume = 0.75f;
+        private const float Match3SfxVolume = 0.9f;
         private const int DefaultTrayCapacity = 7;
         private const int MaxSymbolsOnLevel = 26;
         private const int MaxStackHeightPerSector = 9;
@@ -98,6 +100,7 @@ namespace Tiles.Gameplay
         private Texture2D _restartButtonTexture;
         private AudioClip _bgmClip;
         private AudioClip _tileTouchClip;
+        private AudioClip _match3Clip;
         private AudioSource _bgmSource;
         private AudioSource _sfxSource;
         private readonly Dictionary<TileType, Texture2D> _tileSymbols = new Dictionary<TileType, Texture2D>();
@@ -182,6 +185,7 @@ namespace Tiles.Gameplay
             _restartButtonTexture = Resources.Load<Texture2D>(RestartButtonIconResourcePath);
             _bgmClip = Resources.Load<AudioClip>(BgmResourcePath);
             _tileTouchClip = Resources.Load<AudioClip>(TileTouchSfxResourcePath);
+            _match3Clip = Resources.Load<AudioClip>(Match3SfxResourcePath);
             _bgmSource = GetComponent<AudioSource>();
             if (_bgmSource == null)
             {
@@ -205,6 +209,10 @@ namespace Tiles.Gameplay
             if (_tileTouchClip == null)
             {
                 Debug.LogError("Tile touch SFX clip not found at Resources/" + TileTouchSfxResourcePath + ".mp3");
+            }
+            if (_match3Clip == null)
+            {
+                Debug.LogError("Match3 SFX clip not found at Resources/" + Match3SfxResourcePath + ".mp3");
             }
 
             _sfxSource = gameObject.AddComponent<AudioSource>();
@@ -835,6 +843,16 @@ namespace Tiles.Gameplay
             _sfxSource.PlayOneShot(_tileTouchClip);
         }
 
+        private void PlayMatch3Sfx()
+        {
+            if (_sfxSource == null || _match3Clip == null)
+            {
+                return;
+            }
+
+            _sfxSource.PlayOneShot(_match3Clip, Match3SfxVolume);
+        }
+
         private bool TryGetTraySlotRect(Rect trayRect, int slotIndex, out Rect slotRect)
         {
             slotRect = new Rect();
@@ -1012,6 +1030,8 @@ namespace Tiles.Gameplay
                 startTime = Time.unscaledTime,
                 seed = _trayMatchVfxSeed++
             });
+
+            PlayMatch3Sfx();
         }
 
         private void SyncProjectedTrayWithGame()
