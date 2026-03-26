@@ -16,6 +16,10 @@ namespace Tiles.Gameplay
         private const string LevelBackgroundResourcePath = "UI/Backgrounds/level_background";
         private const string StartScreenBackgroundResourcePath = "UI/StartScreen/Meta_screen";
         private const string StartScreenActionTextResourcePath = "UI/StartScreen/Actiontext_Start";
+        private const string StartScreenScientistWonderResourcePath = "UI/StartScreen/Scientist_wonder";
+        private const string StartScreenScientistHappyResourcePath = "UI/StartScreen/Scientist_happy";
+        private const string StartScreenScientistSupportResourcePath = "UI/StartScreen/Scientist_support";
+        private const string StartScreenDialogueWindowResourcePath = "UI/StartScreen/dialogue_window";
         private const string BgmResourcePath = "Music/tiles_main_theme";
         private const string StartScreenMusicResourcePath = "Music/start";
         private const string TileTouchSfxResourcePath = "Sfx/tile_touch";
@@ -40,6 +44,8 @@ namespace Tiles.Gameplay
         private const float MixSymbolPulseScale = 0.08f;
         private const float StartScreenBlinkPeriodSeconds = 1f;
         private const float StartScreenActionTextScale = 0.75f;
+        private const float StartScreenScientistFadeDurationSeconds = 0.35f;
+        private const float StartScreenDialogueFadeDurationSeconds = 0.35f;
         private const float StartScreenMusicVolume = 0.5f;
         private const float BgmVolume = 0.45f;
         private const float TileTouchSfxVolume = 0.75f;
@@ -50,6 +56,9 @@ namespace Tiles.Gameplay
         private const int BoardColumns = 6;
         private const int BoardRows = 6;
         private const int MaxStacksPerLayer = BoardColumns * BoardRows;
+        private const string StartScreenDialogueLine1 = "Великий Суперкомпьютер! Ты заработал!";
+        private const string StartScreenDialogueLine2 = "Теперь у человечества есть шанс!";
+        private const string StartScreenDialogueLine3 = "Вперёд! Обрабатывай плиткобайты информации, чтобы найти решение!";
         private static readonly Rect TileBaseCropUv = new Rect(0.15625f, 0.115234375f, 0.6875f, 0.7529296875f);
 
         private static readonly Dictionary<TileType, string> TileSymbolFileByType = new Dictionary<TileType, string>
@@ -95,6 +104,7 @@ namespace Tiles.Gameplay
         private GUIStyle _trayStyle;
         private GUIStyle _buttonStyle;
         private GUIStyle _tileOverlayStyle;
+        private GUIStyle _startScreenDialogueStyle;
         private bool _isPortrait = true;
         private bool _styleIsPortrait = true;
         private float _uiScale = 1f;
@@ -103,6 +113,10 @@ namespace Tiles.Gameplay
         private Texture2D _levelBackgroundTexture;
         private Texture2D _startScreenBackgroundTexture;
         private Texture2D _startScreenActionTextTexture;
+        private Texture2D _startScreenScientistWonderTexture;
+        private Texture2D _startScreenScientistHappyTexture;
+        private Texture2D _startScreenScientistSupportTexture;
+        private Texture2D _startScreenDialogueWindowTexture;
         private Texture2D _undoButtonTexture;
         private Texture2D _hintButtonTexture;
         private Texture2D _restartButtonTexture;
@@ -127,9 +141,27 @@ namespace Tiles.Gameplay
         private bool _hasPendingCompactTargetTray;
         private bool _isMixVfxActive;
         private bool _isStartScreenActive = true;
+        private bool _isStartScreenDialogueVisible;
         private float _mixVfxStartedAt;
+        private float _startScreenScientistTransitionStartedAt = -1f;
+        private float _startScreenDialogueFadeStartedAt = -1f;
+        private float _startScreenTapUnlockAt;
         private int _flightSequence;
         private int _trayMatchVfxSeed;
+        private string _startScreenDialogueText = string.Empty;
+        private string _pendingStartScreenDialogueText = string.Empty;
+        private StartScreenStage _startScreenStage = StartScreenStage.Prompt;
+        private Texture2D _currentStartScreenScientistTexture;
+        private Texture2D _previousStartScreenScientistTexture;
+
+        private enum StartScreenStage
+        {
+            Prompt = 0,
+            WonderIntro = 1,
+            HappyIntro = 2,
+            SupportIntro = 3,
+            ReadyToStart = 4
+        }
 
         private sealed class TileFlightAnimation
         {
@@ -193,6 +225,10 @@ namespace Tiles.Gameplay
             _levelBackgroundTexture = Resources.Load<Texture2D>(LevelBackgroundResourcePath);
             _startScreenBackgroundTexture = Resources.Load<Texture2D>(StartScreenBackgroundResourcePath);
             _startScreenActionTextTexture = Resources.Load<Texture2D>(StartScreenActionTextResourcePath);
+            _startScreenScientistWonderTexture = Resources.Load<Texture2D>(StartScreenScientistWonderResourcePath);
+            _startScreenScientistHappyTexture = Resources.Load<Texture2D>(StartScreenScientistHappyResourcePath);
+            _startScreenScientistSupportTexture = Resources.Load<Texture2D>(StartScreenScientistSupportResourcePath);
+            _startScreenDialogueWindowTexture = Resources.Load<Texture2D>(StartScreenDialogueWindowResourcePath);
             _undoButtonTexture = Resources.Load<Texture2D>(UndoButtonIconResourcePath);
             _hintButtonTexture = Resources.Load<Texture2D>(HintButtonIconResourcePath);
             _restartButtonTexture = Resources.Load<Texture2D>(RestartButtonIconResourcePath);
@@ -228,6 +264,22 @@ namespace Tiles.Gameplay
             {
                 Debug.LogError("Start screen action text not found at Resources/" + StartScreenActionTextResourcePath + ".png");
             }
+            if (_startScreenScientistWonderTexture == null)
+            {
+                Debug.LogError("Start screen scientist wonder not found at Resources/" + StartScreenScientistWonderResourcePath + ".png");
+            }
+            if (_startScreenScientistHappyTexture == null)
+            {
+                Debug.LogError("Start screen scientist happy not found at Resources/" + StartScreenScientistHappyResourcePath + ".png");
+            }
+            if (_startScreenScientistSupportTexture == null)
+            {
+                Debug.LogError("Start screen scientist support not found at Resources/" + StartScreenScientistSupportResourcePath + ".png");
+            }
+            if (_startScreenDialogueWindowTexture == null)
+            {
+                Debug.LogError("Start screen dialogue window not found at Resources/" + StartScreenDialogueWindowResourcePath + ".png");
+            }
             if (_startScreenClip == null)
             {
                 Debug.LogError("Start screen music clip not found at Resources/" + StartScreenMusicResourcePath + ".mp3");
@@ -259,6 +311,7 @@ namespace Tiles.Gameplay
             }
 
             LoadTileSymbols();
+            InitializeStartScreenState();
             StartStartScreenAudio();
         }
 
@@ -381,8 +434,25 @@ namespace Tiles.Gameplay
             GUI.Label(rect, levelText, _topLevelStyle);
         }
 
+        private void InitializeStartScreenState()
+        {
+            _isStartScreenActive = true;
+            _isStartScreenDialogueVisible = false;
+            _startScreenStage = StartScreenStage.Prompt;
+            _startScreenDialogueText = string.Empty;
+            _pendingStartScreenDialogueText = string.Empty;
+            _currentStartScreenScientistTexture = null;
+            _previousStartScreenScientistTexture = null;
+            _startScreenScientistTransitionStartedAt = -1f;
+            _startScreenDialogueFadeStartedAt = -1f;
+            _startScreenTapUnlockAt = 0f;
+        }
+
         private void DrawStartScreen()
         {
+            var now = Time.unscaledTime;
+            UpdateStartScreenSceneState(now);
+
             var screenRect = new Rect(0f, 0f, Screen.width, Screen.height);
             if (_startScreenBackgroundTexture != null)
             {
@@ -396,7 +466,7 @@ namespace Tiles.Gameplay
                 GUI.color = previousColor;
             }
 
-            if (_startScreenActionTextTexture != null)
+            if (_startScreenStage == StartScreenStage.Prompt && _startScreenActionTextTexture != null)
             {
                 var pulse = 0.5f + 0.5f * Mathf.Sin((Time.unscaledTime / StartScreenBlinkPeriodSeconds) * Mathf.PI * 2f);
                 var alpha = Mathf.Lerp(0.15f, 1f, pulse);
@@ -418,11 +488,295 @@ namespace Tiles.Gameplay
                 GUI.DrawTexture(actionRect, _startScreenActionTextTexture, ScaleMode.ScaleToFit, true);
                 GUI.color = previousColor;
             }
+            else
+            {
+                DrawStartScreenDialogueScene(now);
+            }
 
             if (GUI.Button(screenRect, GUIContent.none, GUIStyle.none))
             {
-                StartGameplayFromStartScreen();
+                HandleStartScreenTap(now);
             }
+        }
+
+        private void DrawStartScreenDialogueScene(float now)
+        {
+            var scientistTextureForLayout = _currentStartScreenScientistTexture != null
+                ? _currentStartScreenScientistTexture
+                : _previousStartScreenScientistTexture;
+            if (scientistTextureForLayout == null)
+            {
+                return;
+            }
+
+            var scientistMarginX = Screen.width * 0.02f;
+            var scientistMarginBottom = Screen.height * 0.02f;
+            var scientistMaxWidth = Screen.width * (_isPortrait ? 0.45f : 0.28f);
+            var scientistMaxHeight = Screen.height * (_isPortrait ? 0.46f : 0.74f);
+            var scientistRect = BuildBottomLeftFittedRect(
+                scientistTextureForLayout,
+                scientistMarginX,
+                Screen.height - scientistMarginBottom,
+                scientistMaxWidth,
+                scientistMaxHeight);
+
+            var scientistProgress = GetStartScreenScientistTransitionProgress(now);
+            var currentScientistAlpha = 1f;
+            var previousScientistAlpha = 0f;
+            if (_startScreenScientistTransitionStartedAt >= 0f)
+            {
+                if (_previousStartScreenScientistTexture != null)
+                {
+                    previousScientistAlpha = 1f - scientistProgress;
+                    currentScientistAlpha = scientistProgress;
+                }
+                else
+                {
+                    currentScientistAlpha = scientistProgress;
+                }
+            }
+
+            if (_previousStartScreenScientistTexture != null && previousScientistAlpha > 0f)
+            {
+                DrawTextureWithAlpha(scientistRect, _previousStartScreenScientistTexture, previousScientistAlpha, ScaleMode.ScaleToFit);
+            }
+
+            if (_currentStartScreenScientistTexture != null && currentScientistAlpha > 0f)
+            {
+                DrawTextureWithAlpha(scientistRect, _currentStartScreenScientistTexture, currentScientistAlpha, ScaleMode.ScaleToFit);
+            }
+
+            var dialogueAlpha = GetStartScreenDialogueAlpha(now);
+            if (dialogueAlpha <= 0f)
+            {
+                return;
+            }
+
+            var dialogueWidth = Screen.width * (_isPortrait ? 0.72f : 0.58f);
+            var dialogueHeight = Screen.height * (_isPortrait ? 0.24f : 0.36f);
+            var dialogueMargin = Screen.width * 0.02f;
+            var dialogueX = Mathf.Clamp(
+                scientistRect.x + scientistRect.width * 0.24f,
+                dialogueMargin,
+                Screen.width - dialogueWidth - dialogueMargin);
+            var dialogueY = scientistRect.y - dialogueHeight - (Screen.height * 0.015f);
+            dialogueY = Mathf.Clamp(
+                dialogueY,
+                Screen.height * 0.02f,
+                Screen.height - dialogueHeight - (Screen.height * 0.02f));
+            var dialogueRect = new Rect(dialogueX, dialogueY, dialogueWidth, dialogueHeight);
+
+            if (_startScreenDialogueWindowTexture != null)
+            {
+                DrawTextureWithAlpha(dialogueRect, _startScreenDialogueWindowTexture, dialogueAlpha, ScaleMode.ScaleToFit);
+            }
+
+            if (!string.IsNullOrEmpty(_startScreenDialogueText))
+            {
+                var textRect = new Rect(
+                    dialogueRect.x + dialogueRect.width * 0.11f,
+                    dialogueRect.y + dialogueRect.height * 0.16f,
+                    dialogueRect.width * 0.78f,
+                    dialogueRect.height * 0.66f);
+
+                var previousColor = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, dialogueAlpha);
+                GUI.Label(textRect, _startScreenDialogueText, _startScreenDialogueStyle);
+                GUI.color = previousColor;
+            }
+        }
+
+        private void HandleStartScreenTap(float now)
+        {
+            if (!_isStartScreenActive || now < _startScreenTapUnlockAt)
+            {
+                return;
+            }
+
+            switch (_startScreenStage)
+            {
+                case StartScreenStage.Prompt:
+                    BeginStartScreenScientistStep(
+                        StartScreenStage.WonderIntro,
+                        _startScreenScientistWonderTexture,
+                        StartScreenDialogueLine1,
+                        fadeDialogueWindow: true,
+                        now);
+                    break;
+                case StartScreenStage.WonderIntro:
+                    BeginStartScreenScientistStep(
+                        StartScreenStage.HappyIntro,
+                        _startScreenScientistHappyTexture,
+                        StartScreenDialogueLine2,
+                        fadeDialogueWindow: false,
+                        now);
+                    break;
+                case StartScreenStage.HappyIntro:
+                    BeginStartScreenScientistStep(
+                        StartScreenStage.SupportIntro,
+                        _startScreenScientistSupportTexture,
+                        StartScreenDialogueLine3,
+                        fadeDialogueWindow: false,
+                        now);
+                    break;
+                case StartScreenStage.ReadyToStart:
+                    StartGameplayFromStartScreen();
+                    break;
+            }
+        }
+
+        private void BeginStartScreenScientistStep(
+            StartScreenStage stage,
+            Texture2D nextScientistTexture,
+            string nextDialogueText,
+            bool fadeDialogueWindow,
+            float now)
+        {
+            _startScreenStage = stage;
+
+            var scientistTransitionDuration = 0f;
+            if (nextScientistTexture != null)
+            {
+                var currentScientistTexture = _currentStartScreenScientistTexture;
+                _currentStartScreenScientistTexture = nextScientistTexture;
+                if (currentScientistTexture == nextScientistTexture)
+                {
+                    _previousStartScreenScientistTexture = null;
+                    _startScreenScientistTransitionStartedAt = -1f;
+                }
+                else
+                {
+                    _previousStartScreenScientistTexture = currentScientistTexture;
+                    _startScreenScientistTransitionStartedAt = now;
+                    scientistTransitionDuration = StartScreenScientistFadeDurationSeconds;
+                }
+            }
+            else
+            {
+                _previousStartScreenScientistTexture = null;
+                _startScreenScientistTransitionStartedAt = -1f;
+            }
+
+            if (fadeDialogueWindow)
+            {
+                _startScreenDialogueText = nextDialogueText;
+                _pendingStartScreenDialogueText = string.Empty;
+                _isStartScreenDialogueVisible = false;
+                _startScreenDialogueFadeStartedAt = now + scientistTransitionDuration;
+                _startScreenTapUnlockAt = _startScreenDialogueFadeStartedAt + StartScreenDialogueFadeDurationSeconds;
+            }
+            else
+            {
+                if (scientistTransitionDuration > 0f)
+                {
+                    _pendingStartScreenDialogueText = nextDialogueText;
+                }
+                else
+                {
+                    _startScreenDialogueText = nextDialogueText;
+                    _pendingStartScreenDialogueText = string.Empty;
+                }
+
+                _isStartScreenDialogueVisible = true;
+                _startScreenDialogueFadeStartedAt = -1f;
+                _startScreenTapUnlockAt = now + scientistTransitionDuration;
+
+                if (_startScreenStage == StartScreenStage.SupportIntro && scientistTransitionDuration <= 0f)
+                {
+                    _startScreenStage = StartScreenStage.ReadyToStart;
+                }
+            }
+        }
+
+        private void UpdateStartScreenSceneState(float now)
+        {
+            if (!_isStartScreenActive || _startScreenStage == StartScreenStage.Prompt)
+            {
+                return;
+            }
+
+            if (_startScreenScientistTransitionStartedAt >= 0f)
+            {
+                var progress = GetStartScreenScientistTransitionProgress(now);
+                if (progress >= 1f)
+                {
+                    _startScreenScientistTransitionStartedAt = -1f;
+                    _previousStartScreenScientistTexture = null;
+
+                    if (!string.IsNullOrEmpty(_pendingStartScreenDialogueText))
+                    {
+                        _startScreenDialogueText = _pendingStartScreenDialogueText;
+                        _pendingStartScreenDialogueText = string.Empty;
+                    }
+
+                    if (_startScreenStage == StartScreenStage.SupportIntro)
+                    {
+                        _startScreenStage = StartScreenStage.ReadyToStart;
+                        _startScreenTapUnlockAt = now;
+                    }
+                }
+            }
+
+            if (!_isStartScreenDialogueVisible && _startScreenDialogueFadeStartedAt >= 0f)
+            {
+                if (now >= _startScreenDialogueFadeStartedAt + StartScreenDialogueFadeDurationSeconds)
+                {
+                    _isStartScreenDialogueVisible = true;
+                    _startScreenDialogueFadeStartedAt = -1f;
+                    _startScreenTapUnlockAt = Mathf.Max(_startScreenTapUnlockAt, now);
+                }
+            }
+        }
+
+        private float GetStartScreenScientistTransitionProgress(float now)
+        {
+            if (_startScreenScientistTransitionStartedAt < 0f)
+            {
+                return 1f;
+            }
+
+            return Mathf.Clamp01((now - _startScreenScientistTransitionStartedAt) / StartScreenScientistFadeDurationSeconds);
+        }
+
+        private float GetStartScreenDialogueAlpha(float now)
+        {
+            if (_isStartScreenDialogueVisible)
+            {
+                return 1f;
+            }
+
+            if (_startScreenDialogueFadeStartedAt < 0f || now < _startScreenDialogueFadeStartedAt)
+            {
+                return 0f;
+            }
+
+            return Mathf.Clamp01((now - _startScreenDialogueFadeStartedAt) / StartScreenDialogueFadeDurationSeconds);
+        }
+
+        private static Rect BuildBottomLeftFittedRect(Texture2D texture, float x, float bottomY, float maxWidth, float maxHeight)
+        {
+            if (texture == null || texture.width <= 0 || texture.height <= 0)
+            {
+                return new Rect(x, bottomY - maxHeight, maxWidth, maxHeight);
+            }
+
+            var scale = Mathf.Min(maxWidth / texture.width, maxHeight / texture.height);
+            var width = texture.width * scale;
+            var height = texture.height * scale;
+            return new Rect(x, bottomY - height, width, height);
+        }
+
+        private static void DrawTextureWithAlpha(Rect rect, Texture2D texture, float alpha, ScaleMode scaleMode)
+        {
+            if (texture == null || alpha <= 0f)
+            {
+                return;
+            }
+
+            var previousColor = GUI.color;
+            GUI.color = new Color(previousColor.r, previousColor.g, previousColor.b, previousColor.a * Mathf.Clamp01(alpha));
+            GUI.DrawTexture(rect, texture, scaleMode, true);
+            GUI.color = previousColor;
         }
 
         private void StartStartScreenAudio()
@@ -2204,6 +2558,18 @@ namespace Tiles.Gameplay
             _tileOverlayStyle.active.textColor = _tileOverlayStyle.normal.textColor;
             _tileOverlayStyle.focused.textColor = _tileOverlayStyle.normal.textColor;
             _tileOverlayStyle.hover.textColor = _tileOverlayStyle.normal.textColor;
+
+            _startScreenDialogueStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = ScaleFont(34, landscapeTextFactor),
+                fontStyle = FontStyle.Bold,
+                wordWrap = true
+            };
+            _startScreenDialogueStyle.normal.textColor = new Color(0.12f, 0.15f, 0.2f, 1f);
+            _startScreenDialogueStyle.active.textColor = _startScreenDialogueStyle.normal.textColor;
+            _startScreenDialogueStyle.focused.textColor = _startScreenDialogueStyle.normal.textColor;
+            _startScreenDialogueStyle.hover.textColor = _startScreenDialogueStyle.normal.textColor;
         }
 
         private void DrawTileStateOverlay(Rect tileRect, bool isFree, bool isHint)
