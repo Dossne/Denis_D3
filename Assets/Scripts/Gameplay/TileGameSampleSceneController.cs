@@ -61,6 +61,7 @@ namespace Tiles.Gameplay
         private const float MetaScreenOutroFadeDurationSeconds = 0.45f;
         private const float StartScreenDialogueScaleMultiplier = 2f;
         private const float StartScreenHappyScientistScaleMultiplier = 0.8f;
+        private const float StartScreenSupportAndWonderScaleMultiplier = 1.045f;
         private const float StartScreenMusicVolume = 0.5f;
         private const float BgmVolume = 0.45f;
         private const float TileTouchSfxVolume = 0.75f;
@@ -75,7 +76,7 @@ namespace Tiles.Gameplay
         private const int MaxStacksPerLayer = BoardColumns * BoardRows;
         private const string MetaScreenDialogueLine1 = "Отлично! Добытых тобой плиткобайтов уже хватило для начала работ!";
         private const string MetaScreenDialogueLine2 = "Продолжай в том же духе, и мы улетим с этой богом проклятой планеты!";
-        private const string MetaScreenDialogueLine3 = "\u0414\u0443\u043c\u0430\u044e, \u0442\u044b \u0438 \u0442\u0430\u043a \u043f\u043e\u043d\u044f\u043b, \u0447\u0442\u043e \u0432\u0432\u0435\u0440\u0445\u0443 \u2014 \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441 \u0440\u0430\u0431\u043e\u0442, \u0430 \u0441\u0440\u0430\u0437\u0443 \u0437\u0430 \u043c\u043d\u043e\u0439 \u2014 \u043a\u043d\u043e\u043f\u043a\u0430 \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0433\u043e \u0443\u0440\u043e\u0432\u043d\u044f... \u0422\u044b \u0436\u0435 \u0421\u0443\u043f\u0435\u0440\u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440";
+        private const string MetaScreenDialogueLine3 = "\u0414\u0443\u043c\u0430\u044e, \u0442\u044b \u043f\u043e\u043d\u044f\u043b, \u0447\u0442\u043e \u0432\u0432\u0435\u0440\u0445\u0443 \u2014 \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441 \u0440\u0430\u0431\u043e\u0442, \u0430  \u0432\u043d\u0438\u0437\u0443 \u2014 \u043a\u043d\u043e\u043f\u043a\u0430 \u0441\u0431\u043e\u0440\u0430 \u043f\u043b\u0438\u0442\u043a\u043e\u0431\u0430\u0439\u0442\u043e\u0432. \u0422\u044b \u0436\u0435 \u0421\u0443\u043f\u0435\u0440\u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440...";
         private const string StartScreenDialogueLine1 = "Великий Суперкомпьютер! Ты заработал!";
         private const string StartScreenDialogueLine2 = "Теперь у человечества есть шанс!";
         private const string StartScreenDialogueLine3 = "Вперёд! Обрабатывай плиткобайты информации, чтобы найти решение!";
@@ -883,7 +884,7 @@ namespace Tiles.Gameplay
 
             var scientistMaxWidth = Screen.width * (_isPortrait ? 0.9f : 0.56f);
             var scientistMaxHeight = Screen.height * (_isPortrait ? 0.92f : 1.48f);
-            var layoutScientistScale = GetMetaScientistScaleMultiplier(scientistTextureForLayout, scientistMaxWidth, scientistMaxHeight);
+            var layoutScientistScale = GetStandardScientistScaleMultiplier(scientistTextureForLayout, scientistMaxWidth, scientistMaxHeight);
             var scientistRect = BuildBottomCenteredFittedRect(
                 scientistTextureForLayout,
                 Screen.width * 0.5f,
@@ -909,7 +910,7 @@ namespace Tiles.Gameplay
 
             if (_previousStartScreenScientistTexture != null && previousScientistAlpha > 0f)
             {
-                var previousScientistScale = GetStartScreenScientistScaleMultiplier(_previousStartScreenScientistTexture);
+                var previousScientistScale = GetStandardScientistScaleMultiplier(_previousStartScreenScientistTexture, scientistMaxWidth, scientistMaxHeight);
                 var previousScientistRect = BuildBottomCenteredFittedRect(
                     _previousStartScreenScientistTexture,
                     Screen.width * 0.5f,
@@ -921,7 +922,7 @@ namespace Tiles.Gameplay
 
             if (_currentStartScreenScientistTexture != null && currentScientistAlpha > 0f)
             {
-                var currentScientistScale = GetStartScreenScientistScaleMultiplier(_currentStartScreenScientistTexture);
+                var currentScientistScale = GetStandardScientistScaleMultiplier(_currentStartScreenScientistTexture, scientistMaxWidth, scientistMaxHeight);
                 var currentScientistRect = BuildBottomCenteredFittedRect(
                     _currentStartScreenScientistTexture,
                     Screen.width * 0.5f,
@@ -937,39 +938,7 @@ namespace Tiles.Gameplay
                 return;
             }
 
-            var dialogueMaxWidth = Screen.width * (_isPortrait ? 0.72f : 0.58f);
-            var dialogueTopSafeMargin = Screen.height * 0.02f;
-            var dialogueMaxHeight = Mathf.Max(1f, scientistRect.y - dialogueTopSafeMargin);
-            var baseDialogueRect = BuildBottomCenteredFittedRect(
-                _startScreenDialogueWindowTexture,
-                Screen.width * 0.5f,
-                scientistRect.y,
-                dialogueMaxWidth,
-                dialogueMaxHeight);
-
-            if (_startScreenDialogueWindowTexture == null)
-            {
-                var fallbackHeight = Mathf.Min(Screen.height * (_isPortrait ? 0.24f : 0.36f), dialogueMaxHeight);
-                baseDialogueRect = new Rect(
-                    (Screen.width - dialogueMaxWidth) * 0.5f,
-                    scientistRect.y - fallbackHeight,
-                    dialogueMaxWidth,
-                    fallbackHeight);
-            }
-
-            var dialogueScaledWidth = baseDialogueRect.width * StartScreenDialogueScaleMultiplier;
-            var dialogueScaledHeight = baseDialogueRect.height * StartScreenDialogueScaleMultiplier;
-            var dialogueWidthClamp = Screen.width * 0.98f;
-            var widthFit = dialogueScaledWidth > 0f ? dialogueWidthClamp / dialogueScaledWidth : 1f;
-            var heightFit = dialogueScaledHeight > 0f ? dialogueMaxHeight / dialogueScaledHeight : 1f;
-            var dialogueFit = Mathf.Min(1f, widthFit, heightFit);
-            dialogueScaledWidth *= dialogueFit;
-            dialogueScaledHeight *= dialogueFit;
-            var dialogueRect = new Rect(
-                (Screen.width - dialogueScaledWidth) * 0.5f,
-                scientistRect.y - dialogueScaledHeight,
-                dialogueScaledWidth,
-                dialogueScaledHeight);
+            var dialogueRect = BuildStandardDialogueRect(scientistRect);
 
             if (_startScreenDialogueWindowTexture != null)
             {
@@ -983,13 +952,7 @@ namespace Tiles.Gameplay
                     dialogueRect.y + dialogueRect.height * 0.11f,
                     dialogueRect.width * 0.78f,
                     dialogueRect.height * 0.74f);
-                var dialogueStyle = _startScreenDialogueText == StartScreenDialogueLine3
-                    ? _startScreenDialogueLine3Style
-                    : _startScreenDialogueStyle;
-                if (dialogueStyle == null)
-                {
-                    dialogueStyle = _startScreenDialogueStyle;
-                }
+                var dialogueStyle = GetAutoFittedDialogueStyle(_startScreenDialogueText, textRect);
 
                 var previousColor = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, dialogueAlpha);
@@ -1020,7 +983,7 @@ namespace Tiles.Gameplay
 
             var scientistMaxWidth = Screen.width * (_isPortrait ? 0.9f : 0.56f);
             var scientistMaxHeight = Screen.height * (_isPortrait ? 0.92f : 1.48f);
-            var layoutScientistScale = GetStartScreenScientistScaleMultiplier(scientistTextureForLayout);
+            var layoutScientistScale = GetStandardScientistScaleMultiplier(scientistTextureForLayout, scientistMaxWidth, scientistMaxHeight);
             var scientistRect = BuildBottomCenteredFittedRect(
                 scientistTextureForLayout,
                 Screen.width * 0.5f,
@@ -1048,7 +1011,7 @@ namespace Tiles.Gameplay
 
             if (_previousMetaScreenScientistTexture != null && previousScientistAlpha > 0f)
             {
-                var previousScientistScale = GetMetaScientistScaleMultiplier(_previousMetaScreenScientistTexture, scientistMaxWidth, scientistMaxHeight);
+                var previousScientistScale = GetStandardScientistScaleMultiplier(_previousMetaScreenScientistTexture, scientistMaxWidth, scientistMaxHeight);
                 var previousScientistRect = BuildBottomCenteredFittedRect(
                     _previousMetaScreenScientistTexture,
                     Screen.width * 0.5f,
@@ -1060,7 +1023,7 @@ namespace Tiles.Gameplay
 
             if (_currentMetaScreenScientistTexture != null && currentScientistAlpha > 0f)
             {
-                var currentScientistScale = GetMetaScientistScaleMultiplier(_currentMetaScreenScientistTexture, scientistMaxWidth, scientistMaxHeight);
+                var currentScientistScale = GetStandardScientistScaleMultiplier(_currentMetaScreenScientistTexture, scientistMaxWidth, scientistMaxHeight);
                 var currentScientistRect = BuildBottomCenteredFittedRect(
                     _currentMetaScreenScientistTexture,
                     Screen.width * 0.5f,
@@ -1088,39 +1051,7 @@ namespace Tiles.Gameplay
                 return;
             }
 
-            var dialogueMaxWidth = Screen.width * (_isPortrait ? 0.72f : 0.58f);
-            var dialogueTopSafeMargin = Screen.height * 0.02f;
-            var dialogueMaxHeight = Mathf.Max(1f, scientistRect.y - dialogueTopSafeMargin);
-            var baseDialogueRect = BuildBottomCenteredFittedRect(
-                _startScreenDialogueWindowTexture,
-                Screen.width * 0.5f,
-                scientistRect.y,
-                dialogueMaxWidth,
-                dialogueMaxHeight);
-
-            if (_startScreenDialogueWindowTexture == null)
-            {
-                var fallbackHeight = Mathf.Min(Screen.height * (_isPortrait ? 0.24f : 0.36f), dialogueMaxHeight);
-                baseDialogueRect = new Rect(
-                    (Screen.width - dialogueMaxWidth) * 0.5f,
-                    scientistRect.y - fallbackHeight,
-                    dialogueMaxWidth,
-                    fallbackHeight);
-            }
-
-            var dialogueScaledWidth = baseDialogueRect.width * StartScreenDialogueScaleMultiplier;
-            var dialogueScaledHeight = baseDialogueRect.height * StartScreenDialogueScaleMultiplier;
-            var dialogueWidthClamp = Screen.width * 0.98f;
-            var widthFit = dialogueScaledWidth > 0f ? dialogueWidthClamp / dialogueScaledWidth : 1f;
-            var heightFit = dialogueScaledHeight > 0f ? dialogueMaxHeight / dialogueScaledHeight : 1f;
-            var dialogueFit = Mathf.Min(1f, widthFit, heightFit);
-            dialogueScaledWidth *= dialogueFit;
-            dialogueScaledHeight *= dialogueFit;
-            var dialogueRect = new Rect(
-                (Screen.width - dialogueScaledWidth) * 0.5f,
-                scientistRect.y - dialogueScaledHeight,
-                dialogueScaledWidth,
-                dialogueScaledHeight);
+            var dialogueRect = BuildStandardDialogueRect(scientistRect);
 
             if (_startScreenDialogueWindowTexture != null)
             {
@@ -1134,7 +1065,7 @@ namespace Tiles.Gameplay
                     dialogueRect.y + dialogueRect.height * 0.11f,
                     dialogueRect.width * 0.78f,
                     dialogueRect.height * 0.74f);
-                var dialogueStyle = GetMetaDialogueStyle(_metaScreenDialogueText, textRect);
+                var dialogueStyle = GetAutoFittedDialogueStyle(_metaScreenDialogueText, textRect);
 
                 var previousColor = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, dialogueAlpha);
@@ -1541,9 +1472,10 @@ namespace Tiles.Gameplay
             var safeBottomInset = Mathf.Max(0f, Screen.safeArea.yMin);
             var barWidth = Mathf.Min(Screen.width * 0.84f, Scale(860f));
             var barHeight = Scale(36f);
+            const float progressBarDropPixels = 50f;
             var barRect = new Rect(
                 (Screen.width - barWidth) * 0.5f,
-                safeTopInset + Scale(18f),
+                safeTopInset + Scale(18f) + progressBarDropPixels,
                 barWidth,
                 barHeight);
 
@@ -1575,7 +1507,7 @@ namespace Tiles.Gameplay
                 var frameHeight = frameWidth * (textureHeight / (float)textureWidth);
                 var frameRect = new Rect(
                     0f,
-                    barRect.yMax + Scale(8f),
+                    barRect.yMax,
                     frameWidth,
                     frameHeight);
                 GUI.DrawTexture(frameRect, _metaScreenProgressBarTexture, ScaleMode.ScaleToFit, true);
@@ -1651,62 +1583,105 @@ namespace Tiles.Gameplay
                 return StartScreenHappyScientistScaleMultiplier;
             }
 
+            if (texture != null
+                && (texture == _startScreenScientistSupportTexture || texture == _startScreenScientistWonderTexture))
+            {
+                return StartScreenSupportAndWonderScaleMultiplier;
+            }
+
             return 1f;
         }
 
-        private float GetMetaScientistScaleMultiplier(Texture2D texture, float maxWidth, float maxHeight)
+        private float GetStandardScientistScaleMultiplier(Texture2D texture, float maxWidth, float maxHeight)
         {
             var baseMultiplier = GetStartScreenScientistScaleMultiplier(texture);
             if (texture == null
-                || texture != _startScreenScientistDissappointment2Texture
-                || _startScreenScientistSupportTexture == null
+                || _startScreenScientistHappyTexture == null
                 || maxWidth <= 0f
                 || maxHeight <= 0f)
             {
                 return baseMultiplier;
             }
 
-            var supportMultiplier = GetStartScreenScientistScaleMultiplier(_startScreenScientistSupportTexture);
-            var dissRect = BuildBottomCenteredFittedRect(
+            if (texture == _startScreenScientistSupportTexture || texture == _startScreenScientistWonderTexture)
+            {
+                return baseMultiplier;
+            }
+
+            var referenceMultiplier = GetStartScreenScientistScaleMultiplier(_startScreenScientistHappyTexture);
+            var candidateRect = BuildBottomCenteredFittedRect(
                 texture,
                 0f,
                 maxHeight,
                 maxWidth * baseMultiplier,
                 maxHeight * baseMultiplier);
-            var supportRect = BuildBottomCenteredFittedRect(
-                _startScreenScientistSupportTexture,
+            var referenceRect = BuildBottomCenteredFittedRect(
+                _startScreenScientistHappyTexture,
                 0f,
                 maxHeight,
-                maxWidth * supportMultiplier,
-                maxHeight * supportMultiplier);
+                maxWidth * referenceMultiplier,
+                maxHeight * referenceMultiplier);
 
-            if (dissRect.width <= supportRect.width && dissRect.height <= supportRect.height)
+            if (candidateRect.width <= referenceRect.width && candidateRect.height <= referenceRect.height)
             {
                 return baseMultiplier;
             }
 
-            var widthClamp = dissRect.width > 0f ? supportRect.width / dissRect.width : 1f;
-            var heightClamp = dissRect.height > 0f ? supportRect.height / dissRect.height : 1f;
+            var widthClamp = candidateRect.width > 0f ? referenceRect.width / candidateRect.width : 1f;
+            var heightClamp = candidateRect.height > 0f ? referenceRect.height / candidateRect.height : 1f;
             var clampFactor = Mathf.Clamp01(Mathf.Min(widthClamp, heightClamp));
             return baseMultiplier * clampFactor;
         }
 
-        private GUIStyle GetMetaDialogueStyle(string dialogueText, Rect textRect)
+        private Rect BuildStandardDialogueRect(Rect scientistRect)
         {
-            if (dialogueText != MetaScreenDialogueLine3)
+            var dialogueMaxWidth = Screen.width * (_isPortrait ? 0.72f : 0.58f);
+            var dialogueTopSafeMargin = Screen.height * 0.02f;
+            var availableHeight = Mathf.Max(1f, scientistRect.y - dialogueTopSafeMargin);
+
+            if (_startScreenDialogueWindowTexture == null)
             {
-                return _startScreenDialogueStyle;
+                var fallbackHeight = Mathf.Min(Screen.height * (_isPortrait ? 0.24f : 0.36f), availableHeight);
+                return new Rect(
+                    (Screen.width - dialogueMaxWidth) * 0.5f,
+                    scientistRect.y - fallbackHeight,
+                    dialogueMaxWidth,
+                    fallbackHeight);
             }
 
-            var fallbackStyle = _startScreenDialogueLine3Style ?? _startScreenDialogueStyle;
-            var fittedStyle = new GUIStyle(fallbackStyle)
+            var baseDialogueRect = BuildBottomCenteredFittedRect(
+                _startScreenDialogueWindowTexture,
+                Screen.width * 0.5f,
+                scientistRect.y,
+                dialogueMaxWidth,
+                availableHeight);
+            var dialogueScaledWidth = baseDialogueRect.width * StartScreenDialogueScaleMultiplier;
+            var dialogueScaledHeight = baseDialogueRect.height * StartScreenDialogueScaleMultiplier;
+            var dialogueWidthClamp = Screen.width * 0.98f;
+            var widthFit = dialogueScaledWidth > 0f ? dialogueWidthClamp / dialogueScaledWidth : 1f;
+            var heightFit = dialogueScaledHeight > 0f ? availableHeight / dialogueScaledHeight : 1f;
+            var dialogueFit = Mathf.Min(1f, widthFit, heightFit);
+            dialogueScaledWidth *= dialogueFit;
+            dialogueScaledHeight *= dialogueFit;
+            return new Rect(
+                (Screen.width - dialogueScaledWidth) * 0.5f,
+                scientistRect.y - dialogueScaledHeight,
+                dialogueScaledWidth,
+                dialogueScaledHeight);
+        }
+
+        private GUIStyle GetAutoFittedDialogueStyle(string dialogueText, Rect textRect)
+        {
+            var baseStyle = _startScreenDialogueStyle ?? GUI.skin.label;
+            var fittedStyle = new GUIStyle(baseStyle)
             {
                 alignment = TextAnchor.MiddleCenter,
                 wordWrap = true
             };
+
             var landscapeTextFactor = _isPortrait ? 1f : 0.9f;
             var minFontSize = Mathf.Max(10, ScaleFont(24, landscapeTextFactor));
-            var content = new GUIContent(dialogueText);
+            var content = new GUIContent(dialogueText ?? string.Empty);
             var measuredHeight = fittedStyle.CalcHeight(content, textRect.width);
 
             while (fittedStyle.fontSize > minFontSize && measuredHeight > textRect.height)
