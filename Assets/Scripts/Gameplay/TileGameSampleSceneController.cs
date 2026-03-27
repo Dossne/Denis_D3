@@ -19,7 +19,15 @@ namespace Tiles.Gameplay
         private const string StartScreenScientistWonderResourcePath = "UI/StartScreen/Scientist_wonder";
         private const string StartScreenScientistHappyResourcePath = "UI/StartScreen/Scientist_happy";
         private const string StartScreenScientistSupportResourcePath = "UI/StartScreen/Scientist_support";
+        private const string StartScreenScientistDissappointment2ResourcePath = "UI/StartScreen/Scientist_dissappointment_2";
         private const string StartScreenDialogueWindowResourcePath = "UI/StartScreen/dialogue_window";
+        private const string MetaScreenStage01BackgroundResourcePath = "UI/MetaStages/Stage_01";
+        private const string MetaScreenStage02BackgroundResourcePath = "UI/MetaStages/Stage_02";
+        private const string MetaScreenStage03BackgroundResourcePath = "UI/MetaStages/Stage_03";
+        private const string MetaScreenStage04BackgroundResourcePath = "UI/MetaStages/Stage_04";
+        private const string MetaScreenStage05BackgroundResourcePath = "UI/MetaStages/Stage_05";
+        private const string MetaScreenStartButtonResourcePath = "UI/MetaScreen/Start_button";
+        private const string MetaScreenProgressBarResourcePath = "UI/MetaScreen/progressbar";
         private const string WinWindowResourcePath = "UI/ResultScreens/Win_window";
         private const string LoseWindowResourcePath = "UI/ResultScreens/Lose_window";
         private const string BgmResourcePath = "Music/tiles_main_theme";
@@ -50,6 +58,9 @@ namespace Tiles.Gameplay
         private const float StartScreenActionTextScale = 0.75f;
         private const float StartScreenScientistFadeDurationSeconds = 0.35f;
         private const float StartScreenDialogueFadeDurationSeconds = 0.35f;
+        private const float MetaScreenOutroFadeDurationSeconds = 0.45f;
+        private const float StartScreenDialogueScaleMultiplier = 2f;
+        private const float StartScreenHappyScientistScaleMultiplier = 0.8f;
         private const float StartScreenMusicVolume = 0.5f;
         private const float BgmVolume = 0.45f;
         private const float TileTouchSfxVolume = 0.75f;
@@ -58,9 +69,13 @@ namespace Tiles.Gameplay
         private const int DefaultTrayCapacity = 7;
         private const int MaxSymbolsOnLevel = 26;
         private const int MaxStackHeightPerSector = 9;
+        private const int MaxPlayableLevels = 20;
         private const int BoardColumns = 6;
         private const int BoardRows = 6;
         private const int MaxStacksPerLayer = BoardColumns * BoardRows;
+        private const string MetaScreenDialogueLine1 = "Отлично! Добытых тобой плиткобайтов уже хватило для начала работ!";
+        private const string MetaScreenDialogueLine2 = "Продолжай в том же духе, и мы улетим с этой богом проклятой планеты!";
+        private const string MetaScreenDialogueLine3 = "\u0414\u0443\u043c\u0430\u044e, \u0442\u044b \u0438 \u0442\u0430\u043a \u043f\u043e\u043d\u044f\u043b, \u0447\u0442\u043e \u0432\u0432\u0435\u0440\u0445\u0443 \u2014 \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441 \u0440\u0430\u0431\u043e\u0442, \u0430 \u0441\u0440\u0430\u0437\u0443 \u0437\u0430 \u043c\u043d\u043e\u0439 \u2014 \u043a\u043d\u043e\u043f\u043a\u0430 \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0433\u043e \u0443\u0440\u043e\u0432\u043d\u044f... \u0422\u044b \u0436\u0435 \u0421\u0443\u043f\u0435\u0440\u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440";
         private const string StartScreenDialogueLine1 = "Великий Суперкомпьютер! Ты заработал!";
         private const string StartScreenDialogueLine2 = "Теперь у человечества есть шанс!";
         private const string StartScreenDialogueLine3 = "Вперёд! Обрабатывай плиткобайты информации, чтобы найти решение!";
@@ -122,7 +137,15 @@ namespace Tiles.Gameplay
         private Texture2D _startScreenScientistWonderTexture;
         private Texture2D _startScreenScientistHappyTexture;
         private Texture2D _startScreenScientistSupportTexture;
+        private Texture2D _startScreenScientistDissappointment2Texture;
         private Texture2D _startScreenDialogueWindowTexture;
+        private Texture2D _metaScreenStage01BackgroundTexture;
+        private Texture2D _metaScreenStage02BackgroundTexture;
+        private Texture2D _metaScreenStage03BackgroundTexture;
+        private Texture2D _metaScreenStage04BackgroundTexture;
+        private Texture2D _metaScreenStage05BackgroundTexture;
+        private Texture2D _metaScreenStartButtonTexture;
+        private Texture2D _metaScreenProgressBarTexture;
         private Texture2D _winWindowTexture;
         private Texture2D _loseWindowTexture;
         private Texture2D _undoButtonTexture;
@@ -150,20 +173,36 @@ namespace Tiles.Gameplay
         private readonly Dictionary<int, TileType> _mixOldTileTypesById = new Dictionary<int, TileType>();
         private bool _hasPendingCompactTargetTray;
         private bool _isMixVfxActive;
+        private bool _isCheatPanelVisible;
         private bool _isStartScreenActive = true;
+        private bool _isMetaScreenActive;
+        private bool _isMetaScreenIntroFlow;
         private bool _isStartScreenDialogueVisible;
+        private bool _isMetaScreenDialogueVisible;
         private float _mixVfxStartedAt;
         private float _startScreenScientistTransitionStartedAt = -1f;
         private float _startScreenDialogueFadeStartedAt = -1f;
         private float _startScreenTapUnlockAt;
+        private float _metaScreenScientistTransitionStartedAt = -1f;
+        private float _metaScreenDialogueFadeStartedAt = -1f;
+        private float _metaScreenOutroFadeStartedAt = -1f;
+        private float _metaScreenTapUnlockAt;
         private int _flightSequence;
         private int _trayMatchVfxSeed;
+        private int _highestCompletedLevel;
+        private int _metaNextLevelIndex;
+        private int _cheatTargetLevelIndex;
         private GameStatus _lastResultStatus = GameStatus.Playing;
         private string _startScreenDialogueText = string.Empty;
         private string _pendingStartScreenDialogueText = string.Empty;
+        private string _metaScreenDialogueText = string.Empty;
+        private string _pendingMetaScreenDialogueText = string.Empty;
         private StartScreenStage _startScreenStage = StartScreenStage.Prompt;
+        private MetaScreenStage _metaScreenStage = MetaScreenStage.SupportIntro;
         private Texture2D _currentStartScreenScientistTexture;
         private Texture2D _previousStartScreenScientistTexture;
+        private Texture2D _currentMetaScreenScientistTexture;
+        private Texture2D _previousMetaScreenScientistTexture;
 
         private enum StartScreenStage
         {
@@ -172,6 +211,15 @@ namespace Tiles.Gameplay
             HappyIntro = 2,
             SupportIntro = 3,
             ReadyToStart = 4
+        }
+
+        private enum MetaScreenStage
+        {
+            SupportIntro = 0,
+            HappyIntro = 1,
+            DissappointmentIntro = 2,
+            FadingOutToUiOnly = 3,
+            ReadyToStartLevel2 = 4
         }
 
         private sealed class TileFlightAnimation
@@ -239,7 +287,15 @@ namespace Tiles.Gameplay
             _startScreenScientistWonderTexture = Resources.Load<Texture2D>(StartScreenScientistWonderResourcePath);
             _startScreenScientistHappyTexture = Resources.Load<Texture2D>(StartScreenScientistHappyResourcePath);
             _startScreenScientistSupportTexture = Resources.Load<Texture2D>(StartScreenScientistSupportResourcePath);
+            _startScreenScientistDissappointment2Texture = Resources.Load<Texture2D>(StartScreenScientistDissappointment2ResourcePath);
             _startScreenDialogueWindowTexture = Resources.Load<Texture2D>(StartScreenDialogueWindowResourcePath);
+            _metaScreenStage01BackgroundTexture = Resources.Load<Texture2D>(MetaScreenStage01BackgroundResourcePath);
+            _metaScreenStage02BackgroundTexture = Resources.Load<Texture2D>(MetaScreenStage02BackgroundResourcePath);
+            _metaScreenStage03BackgroundTexture = Resources.Load<Texture2D>(MetaScreenStage03BackgroundResourcePath);
+            _metaScreenStage04BackgroundTexture = Resources.Load<Texture2D>(MetaScreenStage04BackgroundResourcePath);
+            _metaScreenStage05BackgroundTexture = Resources.Load<Texture2D>(MetaScreenStage05BackgroundResourcePath);
+            _metaScreenStartButtonTexture = Resources.Load<Texture2D>(MetaScreenStartButtonResourcePath);
+            _metaScreenProgressBarTexture = Resources.Load<Texture2D>(MetaScreenProgressBarResourcePath);
             _winWindowTexture = Resources.Load<Texture2D>(WinWindowResourcePath);
             _loseWindowTexture = Resources.Load<Texture2D>(LoseWindowResourcePath);
             _undoButtonTexture = Resources.Load<Texture2D>(UndoButtonIconResourcePath);
@@ -291,9 +347,41 @@ namespace Tiles.Gameplay
             {
                 Debug.LogError("Start screen scientist support not found at Resources/" + StartScreenScientistSupportResourcePath + ".png");
             }
+            if (_startScreenScientistDissappointment2Texture == null)
+            {
+                Debug.LogError("Start screen scientist dissappointment_2 not found at Resources/" + StartScreenScientistDissappointment2ResourcePath + ".png");
+            }
             if (_startScreenDialogueWindowTexture == null)
             {
                 Debug.LogError("Start screen dialogue window not found at Resources/" + StartScreenDialogueWindowResourcePath + ".png");
+            }
+            if (_metaScreenStage01BackgroundTexture == null)
+            {
+                Debug.LogError("Meta screen stage 01 background not found at Resources/" + MetaScreenStage01BackgroundResourcePath + ".png");
+            }
+            if (_metaScreenStage02BackgroundTexture == null)
+            {
+                Debug.LogError("Meta screen stage 02 background not found at Resources/" + MetaScreenStage02BackgroundResourcePath + ".png");
+            }
+            if (_metaScreenStage03BackgroundTexture == null)
+            {
+                Debug.LogError("Meta screen stage 03 background not found at Resources/" + MetaScreenStage03BackgroundResourcePath + ".png");
+            }
+            if (_metaScreenStage04BackgroundTexture == null)
+            {
+                Debug.LogError("Meta screen stage 04 background not found at Resources/" + MetaScreenStage04BackgroundResourcePath + ".png");
+            }
+            if (_metaScreenStage05BackgroundTexture == null)
+            {
+                Debug.LogError("Meta screen stage 05 background not found at Resources/" + MetaScreenStage05BackgroundResourcePath + ".png");
+            }
+            if (_metaScreenStartButtonTexture == null)
+            {
+                Debug.LogError("Meta screen start button not found at Resources/" + MetaScreenStartButtonResourcePath + ".png");
+            }
+            if (_metaScreenProgressBarTexture == null)
+            {
+                Debug.LogError("Meta screen progress bar not found at Resources/" + MetaScreenProgressBarResourcePath + ".png");
             }
             if (_winWindowTexture == null)
             {
@@ -343,6 +431,7 @@ namespace Tiles.Gameplay
 
             LoadTileSymbols();
             InitializeStartScreenState();
+            InitializeMetaScreenState();
             StartStartScreenAudio();
         }
 
@@ -370,6 +459,14 @@ namespace Tiles.Gameplay
             if (_isStartScreenActive)
             {
                 DrawStartScreen();
+                DrawCheatPanel();
+                return;
+            }
+
+            if (_isMetaScreenActive)
+            {
+                DrawMetaScreen();
+                DrawCheatPanel();
                 return;
             }
 
@@ -443,6 +540,7 @@ namespace Tiles.Gameplay
             DrawControls(controlsRect);
             DrawTray(trayRect);
             DrawOverlay(topRect, trayRect, controlsRect);
+            DrawCheatPanel();
 
             void RecalculateBottomStack()
             {
@@ -466,6 +564,165 @@ namespace Tiles.Gameplay
             GUI.Label(rect, levelText, _topLevelStyle);
         }
 
+        private bool CheatsEnabled => Application.isEditor || Debug.isDebugBuild;
+
+        private void DrawCheatPanel()
+        {
+            if (!CheatsEnabled)
+            {
+                return;
+            }
+
+            var safeTopInset = Mathf.Max(0f, Screen.height - Screen.safeArea.yMax);
+            var margin = Scale(10f);
+            var toggleWidth = Mathf.Min(Scale(160f), Screen.width - (margin * 2f));
+            var toggleHeight = Mathf.Max(48f, Scale(56f));
+            var toggleRect = new Rect(
+                margin,
+                safeTopInset + margin,
+                toggleWidth,
+                toggleHeight);
+
+            if (GUI.Button(toggleRect, "CHEATS", _buttonStyle))
+            {
+                _isCheatPanelVisible = !_isCheatPanelVisible;
+                if (_isCheatPanelVisible)
+                {
+                    _cheatTargetLevelIndex = Mathf.Clamp(_currentLevelIndex, 0, MaxPlayableLevels - 1);
+                }
+            }
+
+            if (!_isCheatPanelVisible)
+            {
+                return;
+            }
+
+            _cheatTargetLevelIndex = Mathf.Clamp(_cheatTargetLevelIndex, 0, MaxPlayableLevels - 1);
+
+            var panelWidth = Mathf.Min(Scale(420f), Screen.width - (margin * 2f));
+            var panelPadding = Scale(10f);
+            var rowHeight = Mathf.Max(40f, Scale(44f));
+            var rowGap = Scale(6f);
+            var panelHeight = panelPadding * 2f + rowHeight * 5f + rowGap * 4f;
+            var panelRect = new Rect(
+                margin,
+                toggleRect.yMax + Scale(8f),
+                panelWidth,
+                panelHeight);
+
+            GUI.Box(panelRect, string.Empty);
+
+            var rowY = panelRect.y + panelPadding;
+            var titleRect = new Rect(panelRect.x + panelPadding, rowY, panelRect.width - panelPadding * 2f, rowHeight);
+            GUI.Label(titleRect, "Dev QA Cheats", _statusStyle);
+            rowY += rowHeight + rowGap;
+
+            var levelRect = new Rect(panelRect.x + panelPadding, rowY, panelRect.width - panelPadding * 2f, rowHeight);
+            GUI.Label(levelRect, "Selected Level: " + (_cheatTargetLevelIndex + 1), _statusStyle);
+            rowY += rowHeight + rowGap;
+
+            var halfGap = Scale(4f);
+            var halfWidth = (panelRect.width - panelPadding * 2f - halfGap) * 0.5f;
+            var prevRect = new Rect(panelRect.x + panelPadding, rowY, halfWidth, rowHeight);
+            var nextRect = new Rect(prevRect.xMax + halfGap, rowY, halfWidth, rowHeight);
+            if (GUI.Button(prevRect, "Prev Level", _buttonStyle))
+            {
+                _cheatTargetLevelIndex = Mathf.Max(0, _cheatTargetLevelIndex - 1);
+            }
+
+            if (GUI.Button(nextRect, "Next Level", _buttonStyle))
+            {
+                _cheatTargetLevelIndex = Mathf.Min(MaxPlayableLevels - 1, _cheatTargetLevelIndex + 1);
+            }
+
+            rowY += rowHeight + rowGap;
+
+            var loadRect = new Rect(panelRect.x + panelPadding, rowY, panelRect.width - panelPadding * 2f, rowHeight);
+            if (GUI.Button(loadRect, "Load Level", _buttonStyle))
+            {
+                LoadCheatLevel();
+            }
+
+            rowY += rowHeight + rowGap;
+
+            var canForceResult = CanForceDebugResult();
+            var previousEnabled = GUI.enabled;
+            GUI.enabled = canForceResult;
+
+            var winRect = new Rect(panelRect.x + panelPadding, rowY, halfWidth, rowHeight);
+            var loseRect = new Rect(winRect.xMax + halfGap, rowY, halfWidth, rowHeight);
+            if (GUI.Button(winRect, "Force WIN", _buttonStyle))
+            {
+                TriggerDebugWin();
+            }
+
+            if (GUI.Button(loseRect, "Force LOSE", _buttonStyle))
+            {
+                TriggerDebugLose();
+            }
+
+            GUI.enabled = previousEnabled;
+        }
+
+        private void LoadCheatLevel()
+        {
+            _currentLevelIndex = Mathf.Clamp(_cheatTargetLevelIndex, 0, MaxPlayableLevels - 1);
+            StartCurrentLevel();
+        }
+
+        private bool CanForceDebugResult()
+        {
+            return !_isStartScreenActive
+                && !_isMetaScreenActive
+                && _game.Status == GameStatus.Playing;
+        }
+
+        private void TriggerDebugWin()
+        {
+            if (!CanForceDebugResult())
+            {
+                return;
+            }
+
+            ClearTransientUiStateForDebugResult();
+            _game.ForceWinForDebug();
+            SyncProjectedTrayWithGame();
+            ApplyVisualTrayFromDenseList(_game.Tray);
+            _lastResultStatus = GameStatus.Playing;
+        }
+
+        private void TriggerDebugLose()
+        {
+            if (!CanForceDebugResult())
+            {
+                return;
+            }
+
+            ClearTransientUiStateForDebugResult();
+            _game.ForceLoseForDebug();
+            SyncProjectedTrayWithGame();
+            ApplyVisualTrayFromDenseList(_game.Tray);
+            _lastResultStatus = GameStatus.Playing;
+        }
+
+        private void ClearTransientUiStateForDebugResult()
+        {
+            _hintTileId = null;
+            _hintExpiresAt = 0f;
+            _activeTileFlights.Clear();
+            _completedTileFlights.Clear();
+            _pendingTileIds.Clear();
+            _projectedTray.Clear();
+            _activeTrayShiftVfx.Clear();
+            _activeTrayMatchVfx.Clear();
+            _activeTrayCompactVfx.Clear();
+            _pendingCompactTargetTray.Clear();
+            _hasPendingCompactTargetTray = false;
+            _mixOldTileTypesById.Clear();
+            _isMixVfxActive = false;
+            _mixVfxStartedAt = 0f;
+        }
+
         private void InitializeStartScreenState()
         {
             _isStartScreenActive = true;
@@ -478,6 +735,61 @@ namespace Tiles.Gameplay
             _startScreenScientistTransitionStartedAt = -1f;
             _startScreenDialogueFadeStartedAt = -1f;
             _startScreenTapUnlockAt = 0f;
+        }
+
+        private void InitializeMetaScreenState()
+        {
+            _isMetaScreenActive = false;
+            _isMetaScreenIntroFlow = false;
+            _isMetaScreenDialogueVisible = false;
+            _metaScreenStage = MetaScreenStage.SupportIntro;
+            _metaScreenDialogueText = string.Empty;
+            _pendingMetaScreenDialogueText = string.Empty;
+            _currentMetaScreenScientistTexture = null;
+            _previousMetaScreenScientistTexture = null;
+            _metaScreenScientistTransitionStartedAt = -1f;
+            _metaScreenDialogueFadeStartedAt = -1f;
+            _metaScreenOutroFadeStartedAt = -1f;
+            _metaScreenTapUnlockAt = 0f;
+            _metaNextLevelIndex = 0;
+        }
+
+        private void OpenMetaScreenAfterLevel1Win()
+        {
+            OpenMetaScreen(1, useIntroFlow: true);
+        }
+
+        private void OpenMetaScreen(int nextLevelIndex, bool useIntroFlow)
+        {
+            InitializeMetaScreenState();
+            _isMetaScreenActive = true;
+            _isMetaScreenIntroFlow = useIntroFlow;
+            _metaNextLevelIndex = Mathf.Clamp(nextLevelIndex, 0, MaxPlayableLevels - 1);
+
+            if (_isMetaScreenIntroFlow)
+            {
+                BeginMetaScreenScientistStep(
+                    MetaScreenStage.SupportIntro,
+                    _startScreenScientistSupportTexture,
+                    MetaScreenDialogueLine1,
+                    fadeDialogueWindow: true,
+                    Time.unscaledTime);
+            }
+            else
+            {
+                _metaScreenStage = MetaScreenStage.ReadyToStartLevel2;
+                _currentMetaScreenScientistTexture = null;
+                _previousMetaScreenScientistTexture = null;
+                _metaScreenDialogueText = string.Empty;
+                _pendingMetaScreenDialogueText = string.Empty;
+                _isMetaScreenDialogueVisible = false;
+                _metaScreenScientistTransitionStartedAt = -1f;
+                _metaScreenDialogueFadeStartedAt = -1f;
+                _metaScreenOutroFadeStartedAt = -1f;
+                _metaScreenTapUnlockAt = 0f;
+            }
+
+            StartStartScreenAudio();
         }
 
         private void DrawStartScreen()
@@ -531,6 +843,34 @@ namespace Tiles.Gameplay
             }
         }
 
+        private void DrawMetaScreen()
+        {
+            var now = Time.unscaledTime;
+            UpdateMetaScreenSceneState(now);
+
+            var screenRect = new Rect(0f, 0f, Screen.width, Screen.height);
+            var backgroundTexture = GetMetaScreenBackgroundTexture();
+            if (backgroundTexture != null)
+            {
+                GUI.DrawTexture(screenRect, backgroundTexture, ScaleMode.ScaleAndCrop, true);
+            }
+            else
+            {
+                var previousColor = GUI.color;
+                GUI.color = Color.black;
+                GUI.DrawTexture(screenRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                GUI.color = previousColor;
+            }
+
+            DrawMetaScreenProgressAndNextLevelButton();
+            DrawMetaScreenDialogueScene(now);
+
+            if (ShouldHandleMetaScreenFullscreenTap() && GUI.Button(screenRect, GUIContent.none, GUIStyle.none))
+            {
+                HandleMetaScreenTap(now);
+            }
+        }
+
         private void DrawStartScreenDialogueScene(float now)
         {
             var scientistTextureForLayout = _currentStartScreenScientistTexture != null
@@ -543,12 +883,13 @@ namespace Tiles.Gameplay
 
             var scientistMaxWidth = Screen.width * (_isPortrait ? 0.9f : 0.56f);
             var scientistMaxHeight = Screen.height * (_isPortrait ? 0.92f : 1.48f);
+            var layoutScientistScale = GetStartScreenScientistScaleMultiplier(scientistTextureForLayout);
             var scientistRect = BuildBottomCenteredFittedRect(
                 scientistTextureForLayout,
                 Screen.width * 0.5f,
                 Screen.height,
-                scientistMaxWidth,
-                scientistMaxHeight);
+                scientistMaxWidth * layoutScientistScale,
+                scientistMaxHeight * layoutScientistScale);
 
             var scientistProgress = GetStartScreenScientistTransitionProgress(now);
             var currentScientistAlpha = 1f;
@@ -568,12 +909,26 @@ namespace Tiles.Gameplay
 
             if (_previousStartScreenScientistTexture != null && previousScientistAlpha > 0f)
             {
-                DrawTextureWithAlpha(scientistRect, _previousStartScreenScientistTexture, previousScientistAlpha, ScaleMode.ScaleToFit);
+                var previousScientistScale = GetStartScreenScientistScaleMultiplier(_previousStartScreenScientistTexture);
+                var previousScientistRect = BuildBottomCenteredFittedRect(
+                    _previousStartScreenScientistTexture,
+                    Screen.width * 0.5f,
+                    Screen.height,
+                    scientistMaxWidth * previousScientistScale,
+                    scientistMaxHeight * previousScientistScale);
+                DrawTextureWithAlpha(previousScientistRect, _previousStartScreenScientistTexture, previousScientistAlpha, ScaleMode.ScaleToFit);
             }
 
             if (_currentStartScreenScientistTexture != null && currentScientistAlpha > 0f)
             {
-                DrawTextureWithAlpha(scientistRect, _currentStartScreenScientistTexture, currentScientistAlpha, ScaleMode.ScaleToFit);
+                var currentScientistScale = GetStartScreenScientistScaleMultiplier(_currentStartScreenScientistTexture);
+                var currentScientistRect = BuildBottomCenteredFittedRect(
+                    _currentStartScreenScientistTexture,
+                    Screen.width * 0.5f,
+                    Screen.height,
+                    scientistMaxWidth * currentScientistScale,
+                    scientistMaxHeight * currentScientistScale);
+                DrawTextureWithAlpha(currentScientistRect, _currentStartScreenScientistTexture, currentScientistAlpha, ScaleMode.ScaleToFit);
             }
 
             var dialogueAlpha = GetStartScreenDialogueAlpha(now);
@@ -585,7 +940,7 @@ namespace Tiles.Gameplay
             var dialogueMaxWidth = Screen.width * (_isPortrait ? 0.72f : 0.58f);
             var dialogueTopSafeMargin = Screen.height * 0.02f;
             var dialogueMaxHeight = Mathf.Max(1f, scientistRect.y - dialogueTopSafeMargin);
-            var dialogueRect = BuildBottomCenteredFittedRect(
+            var baseDialogueRect = BuildBottomCenteredFittedRect(
                 _startScreenDialogueWindowTexture,
                 Screen.width * 0.5f,
                 scientistRect.y,
@@ -595,12 +950,26 @@ namespace Tiles.Gameplay
             if (_startScreenDialogueWindowTexture == null)
             {
                 var fallbackHeight = Mathf.Min(Screen.height * (_isPortrait ? 0.24f : 0.36f), dialogueMaxHeight);
-                dialogueRect = new Rect(
+                baseDialogueRect = new Rect(
                     (Screen.width - dialogueMaxWidth) * 0.5f,
                     scientistRect.y - fallbackHeight,
                     dialogueMaxWidth,
                     fallbackHeight);
             }
+
+            var dialogueScaledWidth = baseDialogueRect.width * StartScreenDialogueScaleMultiplier;
+            var dialogueScaledHeight = baseDialogueRect.height * StartScreenDialogueScaleMultiplier;
+            var dialogueWidthClamp = Screen.width * 0.98f;
+            var widthFit = dialogueScaledWidth > 0f ? dialogueWidthClamp / dialogueScaledWidth : 1f;
+            var heightFit = dialogueScaledHeight > 0f ? dialogueMaxHeight / dialogueScaledHeight : 1f;
+            var dialogueFit = Mathf.Min(1f, widthFit, heightFit);
+            dialogueScaledWidth *= dialogueFit;
+            dialogueScaledHeight *= dialogueFit;
+            var dialogueRect = new Rect(
+                (Screen.width - dialogueScaledWidth) * 0.5f,
+                scientistRect.y - dialogueScaledHeight,
+                dialogueScaledWidth,
+                dialogueScaledHeight);
 
             if (_startScreenDialogueWindowTexture != null)
             {
@@ -625,6 +994,150 @@ namespace Tiles.Gameplay
                 var previousColor = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, dialogueAlpha);
                 GUI.Label(textRect, _startScreenDialogueText, dialogueStyle);
+                GUI.color = previousColor;
+            }
+        }
+
+        private void DrawMetaScreenDialogueScene(float now)
+        {
+            if (!_isMetaScreenIntroFlow)
+            {
+                return;
+            }
+
+            if (_isMetaScreenIntroFlow && _metaScreenStage == MetaScreenStage.ReadyToStartLevel2)
+            {
+                return;
+            }
+
+            var scientistTextureForLayout = _currentMetaScreenScientistTexture != null
+                ? _currentMetaScreenScientistTexture
+                : _previousMetaScreenScientistTexture;
+            if (scientistTextureForLayout == null)
+            {
+                return;
+            }
+
+            var scientistMaxWidth = Screen.width * (_isPortrait ? 0.9f : 0.56f);
+            var scientistMaxHeight = Screen.height * (_isPortrait ? 0.92f : 1.48f);
+            var layoutScientistScale = GetStartScreenScientistScaleMultiplier(scientistTextureForLayout);
+            var scientistRect = BuildBottomCenteredFittedRect(
+                scientistTextureForLayout,
+                Screen.width * 0.5f,
+                Screen.height,
+                scientistMaxWidth * layoutScientistScale,
+                scientistMaxHeight * layoutScientistScale);
+
+            var isOutroFading = _metaScreenStage == MetaScreenStage.FadingOutToUiOnly;
+            var outroFadeProgress = isOutroFading ? GetMetaScreenOutroFadeProgress(now) : 0f;
+            var currentScientistAlpha = isOutroFading ? Mathf.Clamp01(1f - outroFadeProgress) : 1f;
+            var previousScientistAlpha = 0f;
+            if (!isOutroFading && _metaScreenScientistTransitionStartedAt >= 0f)
+            {
+                var scientistProgress = GetMetaScreenScientistTransitionProgress(now);
+                if (_previousMetaScreenScientistTexture != null)
+                {
+                    previousScientistAlpha = 1f - scientistProgress;
+                    currentScientistAlpha = scientistProgress;
+                }
+                else
+                {
+                    currentScientistAlpha = scientistProgress;
+                }
+            }
+
+            if (_previousMetaScreenScientistTexture != null && previousScientistAlpha > 0f)
+            {
+                var previousScientistScale = GetStartScreenScientistScaleMultiplier(_previousMetaScreenScientistTexture);
+                var previousScientistRect = BuildBottomCenteredFittedRect(
+                    _previousMetaScreenScientistTexture,
+                    Screen.width * 0.5f,
+                    Screen.height,
+                    scientistMaxWidth * previousScientistScale,
+                    scientistMaxHeight * previousScientistScale);
+                DrawTextureWithAlpha(previousScientistRect, _previousMetaScreenScientistTexture, previousScientistAlpha, ScaleMode.ScaleToFit);
+            }
+
+            if (_currentMetaScreenScientistTexture != null && currentScientistAlpha > 0f)
+            {
+                var currentScientistScale = GetStartScreenScientistScaleMultiplier(_currentMetaScreenScientistTexture);
+                var currentScientistRect = BuildBottomCenteredFittedRect(
+                    _currentMetaScreenScientistTexture,
+                    Screen.width * 0.5f,
+                    Screen.height,
+                    scientistMaxWidth * currentScientistScale,
+                    scientistMaxHeight * currentScientistScale);
+                if (isOutroFading)
+                {
+                    DrawInterlacedTextureFade(currentScientistRect, _currentMetaScreenScientistTexture, outroFadeProgress);
+                }
+                else
+                {
+                    DrawTextureWithAlpha(currentScientistRect, _currentMetaScreenScientistTexture, currentScientistAlpha, ScaleMode.ScaleToFit);
+                }
+            }
+
+            var dialogueAlpha = GetMetaScreenDialogueAlpha(now);
+            if (isOutroFading)
+            {
+                dialogueAlpha = Mathf.Clamp01(1f - outroFadeProgress);
+            }
+
+            if (dialogueAlpha <= 0f)
+            {
+                return;
+            }
+
+            var dialogueMaxWidth = Screen.width * (_isPortrait ? 0.72f : 0.58f);
+            var dialogueTopSafeMargin = Screen.height * 0.02f;
+            var dialogueMaxHeight = Mathf.Max(1f, scientistRect.y - dialogueTopSafeMargin);
+            var baseDialogueRect = BuildBottomCenteredFittedRect(
+                _startScreenDialogueWindowTexture,
+                Screen.width * 0.5f,
+                scientistRect.y,
+                dialogueMaxWidth,
+                dialogueMaxHeight);
+
+            if (_startScreenDialogueWindowTexture == null)
+            {
+                var fallbackHeight = Mathf.Min(Screen.height * (_isPortrait ? 0.24f : 0.36f), dialogueMaxHeight);
+                baseDialogueRect = new Rect(
+                    (Screen.width - dialogueMaxWidth) * 0.5f,
+                    scientistRect.y - fallbackHeight,
+                    dialogueMaxWidth,
+                    fallbackHeight);
+            }
+
+            var dialogueScaledWidth = baseDialogueRect.width * StartScreenDialogueScaleMultiplier;
+            var dialogueScaledHeight = baseDialogueRect.height * StartScreenDialogueScaleMultiplier;
+            var dialogueWidthClamp = Screen.width * 0.98f;
+            var widthFit = dialogueScaledWidth > 0f ? dialogueWidthClamp / dialogueScaledWidth : 1f;
+            var heightFit = dialogueScaledHeight > 0f ? dialogueMaxHeight / dialogueScaledHeight : 1f;
+            var dialogueFit = Mathf.Min(1f, widthFit, heightFit);
+            dialogueScaledWidth *= dialogueFit;
+            dialogueScaledHeight *= dialogueFit;
+            var dialogueRect = new Rect(
+                (Screen.width - dialogueScaledWidth) * 0.5f,
+                scientistRect.y - dialogueScaledHeight,
+                dialogueScaledWidth,
+                dialogueScaledHeight);
+
+            if (_startScreenDialogueWindowTexture != null)
+            {
+                DrawTextureWithAlpha(dialogueRect, _startScreenDialogueWindowTexture, dialogueAlpha, ScaleMode.ScaleToFit);
+            }
+
+            if (!string.IsNullOrEmpty(_metaScreenDialogueText))
+            {
+                var textRect = new Rect(
+                    dialogueRect.x + dialogueRect.width * 0.11f,
+                    dialogueRect.y + dialogueRect.height * 0.11f,
+                    dialogueRect.width * 0.78f,
+                    dialogueRect.height * 0.74f);
+
+                var previousColor = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, dialogueAlpha);
+                GUI.Label(textRect, _metaScreenDialogueText, _startScreenDialogueStyle);
                 GUI.color = previousColor;
             }
         }
@@ -664,6 +1177,44 @@ namespace Tiles.Gameplay
                     break;
                 case StartScreenStage.ReadyToStart:
                     StartGameplayFromStartScreen();
+                    break;
+            }
+        }
+
+        private void HandleMetaScreenTap(float now)
+        {
+            if (!_isMetaScreenActive || !_isMetaScreenIntroFlow || now < _metaScreenTapUnlockAt)
+            {
+                return;
+            }
+
+            switch (_metaScreenStage)
+            {
+                case MetaScreenStage.SupportIntro:
+                    BeginMetaScreenScientistStep(
+                        MetaScreenStage.HappyIntro,
+                        _startScreenScientistHappyTexture,
+                        MetaScreenDialogueLine2,
+                        fadeDialogueWindow: false,
+                        now);
+                    break;
+                case MetaScreenStage.HappyIntro:
+                {
+                    var dissappointmentTexture = _startScreenScientistDissappointment2Texture != null
+                        ? _startScreenScientistDissappointment2Texture
+                        : _startScreenScientistHappyTexture;
+                    BeginMetaScreenScientistStep(
+                        MetaScreenStage.DissappointmentIntro,
+                        dissappointmentTexture,
+                        MetaScreenDialogueLine3,
+                        fadeDialogueWindow: false,
+                        now);
+                    break;
+                }
+                case MetaScreenStage.DissappointmentIntro:
+                    _metaScreenStage = MetaScreenStage.FadingOutToUiOnly;
+                    _metaScreenOutroFadeStartedAt = now;
+                    _metaScreenTapUnlockAt = now + MetaScreenOutroFadeDurationSeconds;
                     break;
             }
         }
@@ -731,6 +1282,65 @@ namespace Tiles.Gameplay
             }
         }
 
+        private void BeginMetaScreenScientistStep(
+            MetaScreenStage stage,
+            Texture2D nextScientistTexture,
+            string nextDialogueText,
+            bool fadeDialogueWindow,
+            float now)
+        {
+            _metaScreenStage = stage;
+            _metaScreenOutroFadeStartedAt = -1f;
+
+            var scientistTransitionDuration = 0f;
+            if (nextScientistTexture != null)
+            {
+                var currentScientistTexture = _currentMetaScreenScientistTexture;
+                _currentMetaScreenScientistTexture = nextScientistTexture;
+                if (currentScientistTexture == nextScientistTexture)
+                {
+                    _previousMetaScreenScientistTexture = null;
+                    _metaScreenScientistTransitionStartedAt = -1f;
+                }
+                else
+                {
+                    _previousMetaScreenScientistTexture = currentScientistTexture;
+                    _metaScreenScientistTransitionStartedAt = now;
+                    scientistTransitionDuration = StartScreenScientistFadeDurationSeconds;
+                }
+            }
+            else
+            {
+                _previousMetaScreenScientistTexture = null;
+                _metaScreenScientistTransitionStartedAt = -1f;
+            }
+
+            if (fadeDialogueWindow)
+            {
+                _metaScreenDialogueText = nextDialogueText;
+                _pendingMetaScreenDialogueText = string.Empty;
+                _isMetaScreenDialogueVisible = false;
+                _metaScreenDialogueFadeStartedAt = now + scientistTransitionDuration;
+                _metaScreenTapUnlockAt = _metaScreenDialogueFadeStartedAt + StartScreenDialogueFadeDurationSeconds;
+            }
+            else
+            {
+                if (scientistTransitionDuration > 0f)
+                {
+                    _pendingMetaScreenDialogueText = nextDialogueText;
+                }
+                else
+                {
+                    _metaScreenDialogueText = nextDialogueText;
+                    _pendingMetaScreenDialogueText = string.Empty;
+                }
+
+                _isMetaScreenDialogueVisible = true;
+                _metaScreenDialogueFadeStartedAt = -1f;
+                _metaScreenTapUnlockAt = now + scientistTransitionDuration;
+            }
+        }
+
         private void UpdateStartScreenSceneState(float now)
         {
             if (!_isStartScreenActive || _startScreenStage == StartScreenStage.Prompt)
@@ -771,6 +1381,57 @@ namespace Tiles.Gameplay
             }
         }
 
+        private void UpdateMetaScreenSceneState(float now)
+        {
+            if (!_isMetaScreenActive)
+            {
+                return;
+            }
+
+            if (_metaScreenScientistTransitionStartedAt >= 0f)
+            {
+                var progress = GetMetaScreenScientistTransitionProgress(now);
+                if (progress >= 1f)
+                {
+                    _metaScreenScientistTransitionStartedAt = -1f;
+                    _previousMetaScreenScientistTexture = null;
+
+                    if (!string.IsNullOrEmpty(_pendingMetaScreenDialogueText))
+                    {
+                        _metaScreenDialogueText = _pendingMetaScreenDialogueText;
+                        _pendingMetaScreenDialogueText = string.Empty;
+                    }
+                }
+            }
+
+            if (!_isMetaScreenDialogueVisible && _metaScreenDialogueFadeStartedAt >= 0f)
+            {
+                if (now >= _metaScreenDialogueFadeStartedAt + StartScreenDialogueFadeDurationSeconds)
+                {
+                    _isMetaScreenDialogueVisible = true;
+                    _metaScreenDialogueFadeStartedAt = -1f;
+                    _metaScreenTapUnlockAt = Mathf.Max(_metaScreenTapUnlockAt, now);
+                }
+            }
+
+            if (_metaScreenStage == MetaScreenStage.FadingOutToUiOnly)
+            {
+                var fadeProgress = GetMetaScreenOutroFadeProgress(now);
+                if (fadeProgress >= 1f)
+                {
+                    _metaScreenStage = MetaScreenStage.ReadyToStartLevel2;
+                    _metaScreenOutroFadeStartedAt = -1f;
+                    _metaScreenDialogueText = string.Empty;
+                    _pendingMetaScreenDialogueText = string.Empty;
+                    _isMetaScreenDialogueVisible = false;
+                    _metaScreenDialogueFadeStartedAt = -1f;
+                    _currentMetaScreenScientistTexture = null;
+                    _previousMetaScreenScientistTexture = null;
+                    _metaScreenTapUnlockAt = now;
+                }
+            }
+        }
+
         private float GetStartScreenScientistTransitionProgress(float now)
         {
             if (_startScreenScientistTransitionStartedAt < 0f)
@@ -796,6 +1457,179 @@ namespace Tiles.Gameplay
             return Mathf.Clamp01((now - _startScreenDialogueFadeStartedAt) / StartScreenDialogueFadeDurationSeconds);
         }
 
+        private float GetMetaScreenScientistTransitionProgress(float now)
+        {
+            if (_metaScreenScientistTransitionStartedAt < 0f)
+            {
+                return 1f;
+            }
+
+            return Mathf.Clamp01((now - _metaScreenScientistTransitionStartedAt) / StartScreenScientistFadeDurationSeconds);
+        }
+
+        private float GetMetaScreenDialogueAlpha(float now)
+        {
+            if (_isMetaScreenDialogueVisible)
+            {
+                return 1f;
+            }
+
+            if (_metaScreenDialogueFadeStartedAt < 0f || now < _metaScreenDialogueFadeStartedAt)
+            {
+                return 0f;
+            }
+
+            return Mathf.Clamp01((now - _metaScreenDialogueFadeStartedAt) / StartScreenDialogueFadeDurationSeconds);
+        }
+
+        private float GetMetaScreenOutroFadeProgress(float now)
+        {
+            if (_metaScreenStage != MetaScreenStage.FadingOutToUiOnly || _metaScreenOutroFadeStartedAt < 0f)
+            {
+                return 0f;
+            }
+
+            return Mathf.Clamp01((now - _metaScreenOutroFadeStartedAt) / MetaScreenOutroFadeDurationSeconds);
+        }
+
+        private bool ShouldHandleMetaScreenFullscreenTap()
+        {
+            if (!_isMetaScreenActive || !_isMetaScreenIntroFlow)
+            {
+                return false;
+            }
+
+            return _metaScreenStage == MetaScreenStage.SupportIntro
+                || _metaScreenStage == MetaScreenStage.HappyIntro
+                || _metaScreenStage == MetaScreenStage.DissappointmentIntro;
+        }
+
+        private Texture2D GetMetaScreenBackgroundTexture()
+        {
+            if (_highestCompletedLevel >= 20 && _metaScreenStage05BackgroundTexture != null)
+            {
+                return _metaScreenStage05BackgroundTexture;
+            }
+
+            if (_highestCompletedLevel >= 15 && _metaScreenStage04BackgroundTexture != null)
+            {
+                return _metaScreenStage04BackgroundTexture;
+            }
+
+            if (_highestCompletedLevel >= 10 && _metaScreenStage03BackgroundTexture != null)
+            {
+                return _metaScreenStage03BackgroundTexture;
+            }
+
+            if (_highestCompletedLevel >= 5 && _metaScreenStage02BackgroundTexture != null)
+            {
+                return _metaScreenStage02BackgroundTexture;
+            }
+
+            return _metaScreenStage01BackgroundTexture;
+        }
+
+        private float GetMetaProgressNormalized()
+        {
+            return Mathf.Clamp01(_highestCompletedLevel / (float)MaxPlayableLevels);
+        }
+
+        private void DrawMetaScreenProgressAndNextLevelButton()
+        {
+            var safeTopInset = Mathf.Max(0f, Screen.height - Screen.safeArea.yMax);
+            var safeBottomInset = Mathf.Max(0f, Screen.safeArea.yMin);
+            var barWidth = Mathf.Min(Screen.width * 0.84f, Scale(860f));
+            var barHeight = Scale(36f);
+            var barRect = new Rect(
+                (Screen.width - barWidth) * 0.5f,
+                safeTopInset + Scale(18f),
+                barWidth,
+                barHeight);
+
+            var progress = GetMetaProgressNormalized();
+            var previousColor = GUI.color;
+            GUI.color = new Color(0.04f, 0.08f, 0.16f, 0.78f);
+            GUI.DrawTexture(barRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+
+            var fillPadding = Scale(3f);
+            var fillWidth = Mathf.Max(0f, (barRect.width - (fillPadding * 2f)) * progress);
+            if (fillWidth > 0f)
+            {
+                var fillRect = new Rect(
+                    barRect.x + fillPadding,
+                    barRect.y + fillPadding,
+                    fillWidth,
+                    barRect.height - (fillPadding * 2f));
+                GUI.color = new Color(0.16f, 0.84f, 1f, 0.94f);
+                GUI.DrawTexture(fillRect, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+            }
+
+            GUI.color = previousColor;
+
+            if (_metaScreenProgressBarTexture != null)
+            {
+                var textureWidth = Mathf.Max(1, _metaScreenProgressBarTexture.width);
+                var textureHeight = Mathf.Max(1, _metaScreenProgressBarTexture.height);
+                var frameWidth = Screen.width;
+                var frameHeight = frameWidth * (textureHeight / (float)textureWidth);
+                var frameRect = new Rect(
+                    0f,
+                    barRect.yMax + Scale(8f),
+                    frameWidth,
+                    frameHeight);
+                GUI.DrawTexture(frameRect, _metaScreenProgressBarTexture, ScaleMode.ScaleToFit, true);
+            }
+
+            var canStartFromButton = !_isMetaScreenIntroFlow || _metaScreenStage == MetaScreenStage.ReadyToStartLevel2;
+            var previousEnabled = GUI.enabled;
+            GUI.enabled = canStartFromButton;
+
+            if (_metaScreenStartButtonTexture != null)
+            {
+                var buttonBottomMargin = Scale(20f);
+                var buttonBottomY = Screen.height - safeBottomInset - buttonBottomMargin;
+                var buttonMaxWidth = Mathf.Min(Screen.width * 0.68f, Scale(560f));
+                var buttonMaxHeight = Mathf.Min(Screen.height * 0.17f, Scale(260f));
+                var buttonRect = BuildBottomCenteredFittedRect(
+                    _metaScreenStartButtonTexture,
+                    Screen.width * 0.5f,
+                    buttonBottomY,
+                    buttonMaxWidth,
+                    buttonMaxHeight);
+
+                var previousButtonColor = GUI.color;
+                if (!canStartFromButton)
+                {
+                    GUI.color = new Color(previousButtonColor.r, previousButtonColor.g, previousButtonColor.b, previousButtonColor.a * 0.45f);
+                }
+
+                GUI.DrawTexture(buttonRect, _metaScreenStartButtonTexture, ScaleMode.ScaleToFit, true);
+                GUI.color = previousButtonColor;
+
+                if (GUI.Button(buttonRect, GUIContent.none, GUIStyle.none))
+                {
+                    StartSelectedLevelFromMetaScreen();
+                }
+            }
+            else
+            {
+                var buttonWidth = Mathf.Min(Scale(220f), Screen.width - Scale(48f));
+                var buttonHeight = Mathf.Max(48f, Scale(64f));
+                var buttonRect = new Rect(
+                    (Screen.width - buttonWidth) * 0.5f,
+                    Screen.height - safeBottomInset - buttonHeight - Scale(20f),
+                    buttonWidth,
+                    buttonHeight);
+
+                if (GUI.Button(buttonRect, (_metaNextLevelIndex + 1).ToString(), _buttonStyle))
+                {
+                    StartSelectedLevelFromMetaScreen();
+                }
+            }
+
+            GUI.enabled = previousEnabled;
+        }
+
         private static Rect BuildBottomCenteredFittedRect(Texture2D texture, float centerX, float bottomY, float maxWidth, float maxHeight)
         {
             if (texture == null || texture.width <= 0 || texture.height <= 0)
@@ -807,6 +1641,16 @@ namespace Tiles.Gameplay
             var width = texture.width * scale;
             var height = texture.height * scale;
             return new Rect(centerX - (width * 0.5f), bottomY - height, width, height);
+        }
+
+        private float GetStartScreenScientistScaleMultiplier(Texture2D texture)
+        {
+            if (texture != null && texture == _startScreenScientistHappyTexture)
+            {
+                return StartScreenHappyScientistScaleMultiplier;
+            }
+
+            return 1f;
         }
 
         private static void DrawTextureWithAlpha(Rect rect, Texture2D texture, float alpha, ScaleMode scaleMode)
@@ -822,9 +1666,58 @@ namespace Tiles.Gameplay
             GUI.color = previousColor;
         }
 
+        private void DrawInterlacedTextureFade(Rect rect, Texture2D texture, float fadeProgress)
+        {
+            if (texture == null || rect.width <= 0f || rect.height <= 0f)
+            {
+                return;
+            }
+
+            var clampedProgress = Mathf.Clamp01(fadeProgress);
+            if (clampedProgress >= 1f)
+            {
+                return;
+            }
+
+            var stripeHeight = Mathf.Max(1f, Mathf.Round(Scale(4f)));
+            var stripeCount = Mathf.Max(1, Mathf.CeilToInt(rect.height / stripeHeight));
+            var baseAlpha = 1f - clampedProgress;
+
+            for (var stripeIndex = 0; stripeIndex < stripeCount; stripeIndex++)
+            {
+                var stripeY = rect.y + (stripeIndex * stripeHeight);
+                var currentStripeHeight = Mathf.Min(stripeHeight, rect.yMax - stripeY);
+                if (currentStripeHeight <= 0f)
+                {
+                    continue;
+                }
+
+                var parityOffset = (stripeIndex & 1) == 0 ? 0f : 0.5f;
+                var stripeVisibility = 1f - Mathf.Clamp01((clampedProgress * 2f) - parityOffset);
+                if (stripeVisibility <= 0f)
+                {
+                    continue;
+                }
+
+                var stripeRect = new Rect(rect.x, stripeY, rect.width, currentStripeHeight);
+                var normalizedY = (stripeY - rect.y) / rect.height;
+                var normalizedHeight = currentStripeHeight / rect.height;
+                var textureCoords = new Rect(0f, 1f - (normalizedY + normalizedHeight), 1f, normalizedHeight);
+
+                var previousColor = GUI.color;
+                GUI.color = new Color(
+                    previousColor.r,
+                    previousColor.g,
+                    previousColor.b,
+                    previousColor.a * baseAlpha * stripeVisibility);
+                GUI.DrawTextureWithTexCoords(stripeRect, texture, textureCoords, true);
+                GUI.color = previousColor;
+            }
+        }
+
         private void StartStartScreenAudio()
         {
-            if (!_isStartScreenActive || _startScreenAudioSource == null || _startScreenClip == null)
+            if ((!_isStartScreenActive && !_isMetaScreenActive) || _startScreenAudioSource == null || _startScreenClip == null)
             {
                 return;
             }
@@ -850,7 +1743,7 @@ namespace Tiles.Gameplay
 
         private void UpdateResultScreenSfx()
         {
-            if (_isStartScreenActive)
+            if (_isStartScreenActive || _isMetaScreenActive)
             {
                 _lastResultStatus = GameStatus.Playing;
                 return;
@@ -900,6 +1793,18 @@ namespace Tiles.Gameplay
             StartCurrentLevel();
         }
 
+        private void StartSelectedLevelFromMetaScreen()
+        {
+            if (!_isMetaScreenActive)
+            {
+                return;
+            }
+
+            _isMetaScreenActive = false;
+            _currentLevelIndex = Mathf.Clamp(_metaNextLevelIndex, 0, MaxPlayableLevels - 1);
+            StartCurrentLevel();
+        }
+
         private void SyncBackgroundMusic()
         {
             if (_bgmSource == null || _bgmClip == null)
@@ -907,7 +1812,7 @@ namespace Tiles.Gameplay
                 return;
             }
 
-            if (_isStartScreenActive)
+            if (_isStartScreenActive || _isMetaScreenActive)
             {
                 if (_bgmSource.isPlaying)
                 {
@@ -2338,17 +3243,40 @@ namespace Tiles.Gameplay
 
         private void HandleResultOverlayTap()
         {
+            var playedLevelIndex = _currentLevelIndex;
+            var playedLevelNumber = playedLevelIndex + 1;
+
             if (_game.Status == GameStatus.Won)
             {
-                _currentLevelIndex++;
+                _highestCompletedLevel = Mathf.Clamp(
+                    Mathf.Max(_highestCompletedLevel, playedLevelNumber),
+                    0,
+                    MaxPlayableLevels);
+
+                if (playedLevelIndex == 0)
+                {
+                    OpenMetaScreenAfterLevel1Win();
+                    return;
+                }
+
+                var nextLevelIndex = Mathf.Min(playedLevelIndex + 1, MaxPlayableLevels - 1);
+                OpenMetaScreen(nextLevelIndex, useIntroFlow: false);
+                return;
             }
 
-            StartCurrentLevel();
+            if (playedLevelIndex == 0)
+            {
+                StartCurrentLevel();
+                return;
+            }
+
+            OpenMetaScreen(playedLevelIndex, useIntroFlow: false);
         }
 
         private void StartCurrentLevel()
         {
             _isStartScreenActive = false;
+            InitializeMetaScreenState();
             StopStartScreenAudio();
             _hintTileId = null;
             _hintExpiresAt = 0f;

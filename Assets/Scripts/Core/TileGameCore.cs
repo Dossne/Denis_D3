@@ -183,6 +183,22 @@ namespace Tiles.Core
             return true;
         }
 
+        internal void ForceWinForDebug()
+        {
+            for (var i = 0; i < _tiles.Count; i++)
+            {
+                _tiles[i].SetRemoved(true);
+            }
+
+            _tray.Clear();
+            UpdateStatus();
+        }
+
+        internal void ForceLoseForDebug()
+        {
+            Status = GameStatus.Lost;
+        }
+
         public int? GetHintTileId()
         {
             if (Status != GameStatus.Playing)
