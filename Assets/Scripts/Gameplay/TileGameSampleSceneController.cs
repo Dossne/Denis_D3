@@ -541,14 +541,12 @@ namespace Tiles.Gameplay
                 return;
             }
 
-            var scientistMarginX = Screen.width * 0.02f;
-            var scientistMarginBottom = Screen.height * 0.02f;
             var scientistMaxWidth = Screen.width * (_isPortrait ? 0.9f : 0.56f);
             var scientistMaxHeight = Screen.height * (_isPortrait ? 0.92f : 1.48f);
-            var scientistRect = BuildBottomLeftFittedRect(
+            var scientistRect = BuildBottomCenteredFittedRect(
                 scientistTextureForLayout,
-                scientistMarginX,
-                Screen.height - scientistMarginBottom,
+                Screen.width * 0.5f,
+                Screen.height,
                 scientistMaxWidth,
                 scientistMaxHeight);
 
@@ -584,25 +582,25 @@ namespace Tiles.Gameplay
                 return;
             }
 
-            var dialogueWidth = Screen.width * (_isPortrait ? 0.72f : 0.58f);
-            var dialogueHeight = Screen.height * (_isPortrait ? 0.24f : 0.36f);
-            var dialogueMargin = Screen.width * 0.02f;
-            var dialogueX = Mathf.Clamp(
-                scientistRect.x + scientistRect.width * 0.24f,
-                dialogueMargin,
-                Screen.width - dialogueWidth - dialogueMargin);
-            var dialogueY = scientistRect.y - dialogueHeight - (Screen.height * 0.13f);
-            var dialogueMinY = Screen.height * 0.02f;
-            var dialogueMaxY = Mathf.Min(
-                Screen.height - dialogueHeight - (Screen.height * 0.02f),
-                scientistRect.y - dialogueHeight - (Screen.height * 0.04f));
-            if (dialogueMaxY < dialogueMinY)
-            {
-                dialogueMaxY = dialogueMinY;
-            }
+            var dialogueMaxWidth = Screen.width * (_isPortrait ? 0.72f : 0.58f);
+            var dialogueTopSafeMargin = Screen.height * 0.02f;
+            var dialogueMaxHeight = Mathf.Max(1f, scientistRect.y - dialogueTopSafeMargin);
+            var dialogueRect = BuildBottomCenteredFittedRect(
+                _startScreenDialogueWindowTexture,
+                Screen.width * 0.5f,
+                scientistRect.y,
+                dialogueMaxWidth,
+                dialogueMaxHeight);
 
-            dialogueY = Mathf.Clamp(dialogueY, dialogueMinY, dialogueMaxY);
-            var dialogueRect = new Rect(dialogueX, dialogueY, dialogueWidth, dialogueHeight);
+            if (_startScreenDialogueWindowTexture == null)
+            {
+                var fallbackHeight = Mathf.Min(Screen.height * (_isPortrait ? 0.24f : 0.36f), dialogueMaxHeight);
+                dialogueRect = new Rect(
+                    (Screen.width - dialogueMaxWidth) * 0.5f,
+                    scientistRect.y - fallbackHeight,
+                    dialogueMaxWidth,
+                    fallbackHeight);
+            }
 
             if (_startScreenDialogueWindowTexture != null)
             {
@@ -798,17 +796,17 @@ namespace Tiles.Gameplay
             return Mathf.Clamp01((now - _startScreenDialogueFadeStartedAt) / StartScreenDialogueFadeDurationSeconds);
         }
 
-        private static Rect BuildBottomLeftFittedRect(Texture2D texture, float x, float bottomY, float maxWidth, float maxHeight)
+        private static Rect BuildBottomCenteredFittedRect(Texture2D texture, float centerX, float bottomY, float maxWidth, float maxHeight)
         {
             if (texture == null || texture.width <= 0 || texture.height <= 0)
             {
-                return new Rect(x, bottomY - maxHeight, maxWidth, maxHeight);
+                return new Rect(centerX - (maxWidth * 0.5f), bottomY - maxHeight, maxWidth, maxHeight);
             }
 
             var scale = Mathf.Min(maxWidth / texture.width, maxHeight / texture.height);
             var width = texture.width * scale;
             var height = texture.height * scale;
-            return new Rect(x, bottomY - height, width, height);
+            return new Rect(centerX - (width * 0.5f), bottomY - height, width, height);
         }
 
         private static void DrawTextureWithAlpha(Rect rect, Texture2D texture, float alpha, ScaleMode scaleMode)
