@@ -110,6 +110,7 @@ namespace Tiles.Gameplay
         private GUIStyle _buttonStyle;
         private GUIStyle _tileOverlayStyle;
         private GUIStyle _startScreenDialogueStyle;
+        private GUIStyle _startScreenDialogueLine3Style;
         private bool _isPortrait = true;
         private bool _styleIsPortrait = true;
         private float _uiScale = 1f;
@@ -615,10 +616,17 @@ namespace Tiles.Gameplay
                     dialogueRect.y + dialogueRect.height * 0.11f,
                     dialogueRect.width * 0.78f,
                     dialogueRect.height * 0.74f);
+                var dialogueStyle = _startScreenDialogueText == StartScreenDialogueLine3
+                    ? _startScreenDialogueLine3Style
+                    : _startScreenDialogueStyle;
+                if (dialogueStyle == null)
+                {
+                    dialogueStyle = _startScreenDialogueStyle;
+                }
 
                 var previousColor = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, dialogueAlpha);
-                GUI.Label(textRect, _startScreenDialogueText, _startScreenDialogueStyle);
+                GUI.Label(textRect, _startScreenDialogueText, dialogueStyle);
                 GUI.color = previousColor;
             }
         }
@@ -2671,10 +2679,11 @@ namespace Tiles.Gameplay
             _tileOverlayStyle.focused.textColor = _tileOverlayStyle.normal.textColor;
             _tileOverlayStyle.hover.textColor = _tileOverlayStyle.normal.textColor;
 
+            var dialogueFontSize = ScaleFont(68, landscapeTextFactor);
             _startScreenDialogueStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontSize = ScaleFont(68, landscapeTextFactor),
+                fontSize = dialogueFontSize,
                 fontStyle = FontStyle.Bold,
                 wordWrap = true
             };
@@ -2682,6 +2691,11 @@ namespace Tiles.Gameplay
             _startScreenDialogueStyle.active.textColor = _startScreenDialogueStyle.normal.textColor;
             _startScreenDialogueStyle.focused.textColor = _startScreenDialogueStyle.normal.textColor;
             _startScreenDialogueStyle.hover.textColor = _startScreenDialogueStyle.normal.textColor;
+
+            _startScreenDialogueLine3Style = new GUIStyle(_startScreenDialogueStyle)
+            {
+                fontSize = Mathf.Max(10, Mathf.RoundToInt(dialogueFontSize * 0.7f))
+            };
         }
 
         private void DrawTileStateOverlay(Rect tileRect, bool isFree, bool isHint)
