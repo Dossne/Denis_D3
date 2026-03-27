@@ -883,7 +883,7 @@ namespace Tiles.Gameplay
 
             var scientistMaxWidth = Screen.width * (_isPortrait ? 0.9f : 0.56f);
             var scientistMaxHeight = Screen.height * (_isPortrait ? 0.92f : 1.48f);
-            var layoutScientistScale = GetStartScreenScientistScaleMultiplier(scientistTextureForLayout);
+            var layoutScientistScale = GetMetaScientistScaleMultiplier(scientistTextureForLayout, scientistMaxWidth, scientistMaxHeight);
             var scientistRect = BuildBottomCenteredFittedRect(
                 scientistTextureForLayout,
                 Screen.width * 0.5f,
@@ -1048,7 +1048,7 @@ namespace Tiles.Gameplay
 
             if (_previousMetaScreenScientistTexture != null && previousScientistAlpha > 0f)
             {
-                var previousScientistScale = GetStartScreenScientistScaleMultiplier(_previousMetaScreenScientistTexture);
+                var previousScientistScale = GetMetaScientistScaleMultiplier(_previousMetaScreenScientistTexture, scientistMaxWidth, scientistMaxHeight);
                 var previousScientistRect = BuildBottomCenteredFittedRect(
                     _previousMetaScreenScientistTexture,
                     Screen.width * 0.5f,
@@ -1060,7 +1060,7 @@ namespace Tiles.Gameplay
 
             if (_currentMetaScreenScientistTexture != null && currentScientistAlpha > 0f)
             {
-                var currentScientistScale = GetStartScreenScientistScaleMultiplier(_currentMetaScreenScientistTexture);
+                var currentScientistScale = GetMetaScientistScaleMultiplier(_currentMetaScreenScientistTexture, scientistMaxWidth, scientistMaxHeight);
                 var currentScientistRect = BuildBottomCenteredFittedRect(
                     _currentMetaScreenScientistTexture,
                     Screen.width * 0.5f,
@@ -1134,10 +1134,11 @@ namespace Tiles.Gameplay
                     dialogueRect.y + dialogueRect.height * 0.11f,
                     dialogueRect.width * 0.78f,
                     dialogueRect.height * 0.74f);
+                var dialogueStyle = GetMetaDialogueStyle(_metaScreenDialogueText, textRect);
 
                 var previousColor = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, dialogueAlpha);
-                GUI.Label(textRect, _metaScreenDialogueText, _startScreenDialogueStyle);
+                GUI.Label(textRect, _metaScreenDialogueText, dialogueStyle);
                 GUI.color = previousColor;
             }
         }
@@ -1651,6 +1652,70 @@ namespace Tiles.Gameplay
             }
 
             return 1f;
+        }
+
+        private float GetMetaScientistScaleMultiplier(Texture2D texture, float maxWidth, float maxHeight)
+        {
+            var baseMultiplier = GetStartScreenScientistScaleMultiplier(texture);
+            if (texture == null
+                || texture != _startScreenScientistDissappointment2Texture
+                || _startScreenScientistSupportTexture == null
+                || maxWidth <= 0f
+                || maxHeight <= 0f)
+            {
+                return baseMultiplier;
+            }
+
+            var supportMultiplier = GetStartScreenScientistScaleMultiplier(_startScreenScientistSupportTexture);
+            var dissRect = BuildBottomCenteredFittedRect(
+                texture,
+                0f,
+                maxHeight,
+                maxWidth * baseMultiplier,
+                maxHeight * baseMultiplier);
+            var supportRect = BuildBottomCenteredFittedRect(
+                _startScreenScientistSupportTexture,
+                0f,
+                maxHeight,
+                maxWidth * supportMultiplier,
+                maxHeight * supportMultiplier);
+
+            if (dissRect.width <= supportRect.width && dissRect.height <= supportRect.height)
+            {
+                return baseMultiplier;
+            }
+
+            var widthClamp = dissRect.width > 0f ? supportRect.width / dissRect.width : 1f;
+            var heightClamp = dissRect.height > 0f ? supportRect.height / dissRect.height : 1f;
+            var clampFactor = Mathf.Clamp01(Mathf.Min(widthClamp, heightClamp));
+            return baseMultiplier * clampFactor;
+        }
+
+        private GUIStyle GetMetaDialogueStyle(string dialogueText, Rect textRect)
+        {
+            if (dialogueText != MetaScreenDialogueLine3)
+            {
+                return _startScreenDialogueStyle;
+            }
+
+            var fallbackStyle = _startScreenDialogueLine3Style ?? _startScreenDialogueStyle;
+            var fittedStyle = new GUIStyle(fallbackStyle)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = true
+            };
+            var landscapeTextFactor = _isPortrait ? 1f : 0.9f;
+            var minFontSize = Mathf.Max(10, ScaleFont(24, landscapeTextFactor));
+            var content = new GUIContent(dialogueText);
+            var measuredHeight = fittedStyle.CalcHeight(content, textRect.width);
+
+            while (fittedStyle.fontSize > minFontSize && measuredHeight > textRect.height)
+            {
+                fittedStyle.fontSize--;
+                measuredHeight = fittedStyle.CalcHeight(content, textRect.width);
+            }
+
+            return fittedStyle;
         }
 
         private static void DrawTextureWithAlpha(Rect rect, Texture2D texture, float alpha, ScaleMode scaleMode)
